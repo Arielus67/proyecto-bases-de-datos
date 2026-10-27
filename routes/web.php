@@ -14,3 +14,10 @@ Route::resource('mesero', ControllerMesa::class);
 Route::resource('cocina', ControllerCocina::class);
 Route::resource('caja', ControllerCaja::class);
 Route::resource('productos', ControllerProductos::class);
+
+
+Route::get('/mesero', [ControllerMesa::class, 'index'])
+    ->name('mesero.index');
+
+Route::get('/mesero/mesas/{id}/productos', [ControllerMesa::class, 'productosMesa'])
+    ->name('mesero.mesas.productos');

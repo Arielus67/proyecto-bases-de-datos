@@ -1,0 +1,180 @@
+/* ==============================
+   TARJETAS DE MESAS
+============================== */
+
+.mesa-card {
+    width: 100%;
+    min-width: 0;
+    padding: 18px;
+    text-align: left;
+    cursor: pointer;
+    background: #fff;
+    border: 2px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 2px 5px rgb(0 0 0 / 5%);
+    transition: background-color .2s ease,
+                border-color .2s ease,
+                box-shadow .2s ease,
+                transform .2s ease;
+}
+
+.mesa-card:hover {
+    background-color: #eff6ff;
+    border-color: #2563eb;
+    box-shadow: 0 8px 20px rgb(37 99 235 / 15%);
+    transform: translateY(-3px);
+}
+
+.mesa-card:focus-visible {
+    outline: 3px solid #60a5fa;
+    outline-offset: 3px;
+}
+
+.mesa-card:active {
+    transform: scale(.98);
+}
+
+/* Mesa seleccionada */
+.mesa-card.seleccionada {
+    background-color: #dbeafe;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 15%);
+}
+
+/* ==============================
+   MENÚ LATERAL NEGRO
+============================== */
+
+#sidebar-menu {
+    background-color: #111827 !important;
+    color: #fff !important;
+    border-color: #272f3d !important;
+}
+
+#sidebar-menu a,
+#sidebar-menu span,
+#sidebar-menu p,
+#sidebar-menu h1,
+#sidebar-menu h2,
+#sidebar-menu h3,
+#sidebar-menu i {
+    color: #e5e7eb;
+}
+
+#sidebar-menu a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 8px;
+    transition: background-color .2s ease;
+}
+
+#sidebar-menu a:hover {
+    background-color: #374151;
+    color: #fff;
+}
+
+#sidebar-menu a:hover i,
+#sidebar-menu a:hover span {
+    color: #fff;
+}
+
+/* ==============================
+   VENTANA EMERGENTE
+============================== */
+
+.comanda-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgb(0 0 0 / 60%);
+}
+
+.comanda-overlay.activa {
+    display: flex;
+}
+
+.comanda-modal {
+    width: 100%;
+    max-width: 850px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
+}
+
+.comanda-producto {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.comanda-producto:hover {
+    background: #f9fafb;
+}
+
+.comanda-agregar {
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: #111827;
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color .2s ease;
+}
+
+.comanda-agregar:hover {
+    background: #2563eb;
+}
+
+/* ==============================
+   TICKET
+============================== */
+
+.ticket-item {
+    padding: 12px 0;
+    border-bottom: 1px dashed #d1d5db;
+}
+
+.ticket-cantidad {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ticket-cantidad button {
+    min-width: 30px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: #f3f4f6;
+    cursor: pointer;
+}
+
+.ticket-cantidad button:hover {
+    background: #dbeafe;
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+
+@media (max-width: 900px) {
+    .comanda-overlay {
+        padding: 10px;
+    }
+
+    .comanda-modal {
+        max-height: 95vh;
+    }
+}

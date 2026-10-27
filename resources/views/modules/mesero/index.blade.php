@@ -1,276 +1,396 @@
 @extends('app')
 
-@section('titulo', 'Gestión de Comandas - Mesero')
+@section('titulo', 'Gestión de Comandas')
 
-@section('botones')
-    <button type="button" class="btn btn-light btn-sm fw-bold" onclick="clearOrder()">
-        <i class="fas fa-trash me-1"></i> Limpiar Comanda
-    </button>
-@endsection
+@push('css')
+    <link rel="stylesheet" href="{{ asset('css/comandas.css') }}">
+@endpush
 
 @section('contenido')
-<div class="row g-3">
-    {{-- COLUMNA IZQUIERDA: Selección de Mesas y Catálogo de Productos --}}
-    <div class="col-lg-7 col-xl-8">
 
-        {{-- 1. Estado de Mesas --}}
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fs-6"><i class="fas fa-chair me-2"></i>Estado de Mesas</h5>
-                <span class="badge bg-primary" id="selectedTableBadge">Seleccione una mesa</span>
-            </div>
-            <div class="card-body">
-                <div class="row row-cols-2 row-cols-md-4 g-2">
-                    @forelse ($mesas as $mesa)
-                        @php
-                            $badgeColor = match (strtoupper($mesa->estado)) {
-                                'DISPONIBLE' => 'success',
-                                'OCUPADA'    => 'danger',
-                                'RESERVADA'  => 'warning',
-                                default      => 'secondary',
-                            };
-                        @endphp
-                        <div class="col">
-                            <div class="card text-center border-{{ $badgeColor }} btn-select-table cursor-pointer"
-                                 onclick="selectTable({{ $mesa->id_mesa }}, '{{ $mesa->numero_mesa }}', '{{ $mesa->estado }}')"
-                                 id="mesa-card-{{ $mesa->id_mesa }}">
-                                <div class="card-body p-2">
-                                    <h6 class="fw-bold mb-0">Mesa {{ $mesa->numero_mesa }}</h6>
-                                    <small class="text-muted d-block">{{ $mesa->capacidad }} pers. ({{ $mesa->zona }})</small>
-                                    <span class="badge bg-{{ $badgeColor }}">
-                                        {{ ucfirst(strtolower($mesa->estado)) }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="col-12 text-center text-muted py-3">
-                            <i class="fas fa-info-circle me-1"></i> No hay mesas registradas en la base de datos.
-                        </div>
-                    @endforelse
+{{-- CONTENEDOR: MESAS A LA IZQUIERDA, TICKET A LA DERECHA --}}
+<div style="display:grid;
+            grid-template-columns:minmax(0, 1fr) 360px;
+            gap:24px;
+            align-items:start;
+            width:100%;">
+
+    {{-- =========================================
+         IZQUIERDA: TARJETAS DE MESAS
+    ========================================== --}}
+    <section style="min-width:0;">
+
+        <div class="mb-5">
+            <h2 class="text-xl font-semibold">Mesas del restaurante</h2>
+            <p class="text-sm text-gray-500">
+                Selecciona una mesa para agregar productos.
+            </p>
+        </div>
+
+        <div style="display:grid;
+                    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+                    gap:16px;">
+
+            @forelse ($mesas as $mesa)
+
+                @php
+                    $estado = strtoupper($mesa->estado ?? '');
+
+                    $colores = [
+                        'DISPONIBLE' => 'bg-green-100 text-green-700',
+                        'OCUPADA' => 'bg-red-100 text-red-700',
+                        'RESERVADA' => 'bg-yellow-100 text-yellow-700',
+                        'MANTENIMIENTO' => 'bg-gray-100 text-gray-700',
+                    ];
+
+                    $color = $colores[$estado] ?? 'bg-gray-100 text-gray-600';
+                @endphp
+
+                <button type="button"
+                    class="mesa-card"
+                    data-mesa-id="{{ $mesa->id_mesa }}"
+                    data-mesa-numero="{{ $mesa->numero_mesa }}"
+                    aria-label="Seleccionar mesa {{ $mesa->numero_mesa }}">
+
+                    <div class="flex justify-between items-center mb-4">
+                        <i class="ti ti-armchair text-3xl text-gray-700"></i>
+
+                        <span class="text-xs font-semibold rounded-full px-2 py-1 {{ $color }}">
+                            {{ $estado }}
+                        </span>
+                    </div>
+
+                    <h3 class="text-lg font-bold">
+                        Mesa {{ $mesa->numero_mesa }}
+                    </h3>
+
+                    <p class="text-sm text-gray-500 mt-1">
+                        {{ $mesa->zona ?: 'Sin zona' }}
+                    </p>
+
+                    <p class="text-sm text-gray-500 mt-2">
+                        <i class="ti ti-users"></i>
+                        {{ $mesa->capacidad }}
+                        {{ $mesa->capacidad == 1 ? 'persona' : 'personas' }}
+                    </p>
+
+                </button>
+
+            @empty
+
+                <div class="border rounded-xl p-8 text-center">
+                    <i class="ti ti-armchair text-4xl text-gray-400"></i>
+                    <p class="font-semibold mt-2">No hay mesas registradas</p>
+                </div>
+
+            @endforelse
+
+        </div>
+    </section>
+
+    {{-- =========================================
+         DERECHA: TICKET DE COMANDA
+    ========================================== --}}
+    <aside style="width:100%;min-width:0;position:sticky;top:20px;">
+
+        <div class="bg-white border rounded-xl shadow-sm overflow-hidden">
+
+            <div class="bg-gray-900 text-white p-5">
+                <div class="flex items-center gap-3">
+                    <i class="ti ti-receipt text-3xl"></i>
+
+                    <div>
+                        <h2 class="text-lg font-bold">Comanda actual</h2>
+                        <p class="text-sm text-gray-300">
+                            Detalle del pedido
+                        </p>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-700 mt-4 pt-3 flex justify-between text-sm">
+                    <span>Fecha</span>
+                    <span>{{ now()->format('d/m/Y H:i') }}</span>
                 </div>
             </div>
-        </div>
 
-        {{-- 2. Menú de Productos --}}
-        <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fs-6"><i class="fas fa-utensils me-2"></i>Platillos y Bebidas</h5>
-                <input type="text" id="searchProduct" class="form-control form-control-sm w-50" placeholder="Buscar producto...">
-            </div>
-            <div class="card-body">
-                <div class="row row-cols-2 row-cols-md-3 g-2" id="productsGrid">
-                    @forelse ($productos as $producto)
-                        <div class="col product-item">
-                            <div class="card h-100 bg-light border-0 text-center p-2 cursor-pointer shadow-sm"
-                                 onclick="addToOrder({{ $producto->id_producto }}, {{ json_encode($producto->nombre_producto) }}, {{ $producto->precio }})">
-                                <h6 class="fw-bold mb-1 small">{{ $producto->nombre_producto }}</h6>
-                                <span class="text-primary fw-bold small">₡{{ number_format($producto->precio, 0, ',', '.') }}</span>
-                                <button type="button" class="btn btn-sm btn-outline-primary mt-2 py-0">+ Agregar</button>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="col-12 text-center text-muted py-3">
-                            <i class="fas fa-exclamation-triangle me-1"></i> No hay productos activos en la base de datos.
-                        </div>
-                    @endforelse
+            <div class="p-5">
+
+                <div class="mb-4">
+                    <span class="text-sm text-gray-500">Mesa seleccionada</span>
+                    <p id="mesa-seleccionada" class="font-semibold">
+                        Ninguna
+                    </p>
                 </div>
+
+                <h3 class="font-semibold mb-3">Productos</h3>
+
+                <div id="ticket-productos">
+                    <p class="text-center text-gray-500 py-8">
+                        <i class="ti ti-shopping-cart text-4xl"></i>
+                        <span class="block mt-2">
+                            Selecciona una mesa y agrega productos.
+                        </span>
+                    </p>
+                </div>
+
+                <div class="space-y-3 mt-5 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Subtotal</span>
+                        <span id="ticket-subtotal">₡0,00</span>
+                    </div>
+
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Impuestos</span>
+                        <span id="ticket-impuestos">₡0,00</span>
+                    </div>
+
+                    <div class="border-t pt-3 flex justify-between text-lg font-bold">
+                        <span>Total</span>
+                        <span id="ticket-total">₡0,00</span>
+                    </div>
+                </div>
+
+                <button type="button"
+                    id="registrar-comanda"
+                    disabled
+                    class="w-full mt-6 rounded-lg bg-gray-300 text-gray-600 py-3 font-semibold">
+                    Registrar comanda
+                </button>
+
+                <p class="text-xs text-gray-400 text-center mt-3">
+                    El pedido todavía no se guarda en la base de datos.
+                </p>
+
             </div>
         </div>
-    </div>
+    </aside>
 
-    {{-- COLUMNA DERECHA: Resumen de Comanda --}}
-    <div class="col-lg-5 col-xl-4">
-        <div class="card shadow-sm sticky-top" style="top: 1rem;">
-            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fs-6"><i class="fas fa-receipt me-2"></i>Comanda Activa</h5>
-                <span class="badge bg-light text-success fw-bold" id="currentMesaTitle">Mesa: N/A</span>
-            </div>
+</div>
 
-            <div class="card-body p-3">
-                <form id="formComanda" action="{{ route('mesero.store') }}" method="POST">
-                    @csrf
-                    <input type="hidden" name="id_mesa" id="inputMesaId" value="">
+{{-- =========================================
+     MODAL: MENÚ DE PRODUCTOS
+========================================== --}}
+<div id="comanda-overlay"
+    class="comanda-overlay"
+    aria-hidden="true">
 
-                    {{-- Inputs dinámicos para los ítems al enviar --}}
-                    <div id="hiddenItemsInputs"></div>
+    <div class="comanda-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menú de productos">
 
-                    <div class="table-responsive mb-2" style="max-height: 280px; overflow-y: auto;">
-                        <table class="table table-sm align-middle" id="orderTable">
-                            <thead>
-                                <tr class="small text-muted">
-                                    <th>Cant.</th>
-                                    <th>Producto</th>
-                                    <th class="text-end">Precio</th>
-                                    <th class="text-center">Ajuste</th>
-                                </tr>
-                            </thead>
-                            <tbody id="orderItemsBody">
-                                <tr id="emptyRow">
-                                    <td colspan="4" class="text-center text-muted py-4 small">
-                                        Selecciona una mesa y agrega productos a la comanda.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="notas" class="form-label small fw-bold">Notas para Cocina / Observaciones:</label>
-                        <textarea name="notas" id="notas" class="form-control form-control-sm" rows="2" placeholder="Ej: Poca sal, sin cebolla..."></textarea>
-                    </div>
-
-                    <div class="bg-light p-2 rounded mb-3 small">
-                        <div class="d-flex justify-content-between mb-1">
-                            <span>Subtotal:</span>
-                            <span class="fw-bold" id="subtotalText">₡0</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-1 text-muted">
-                            <span>Servicio (10%):</span>
-                            <span id="servicioText">₡0</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-1 text-muted">
-                            <span>IVA (13%):</span>
-                            <span id="ivaText">₡0</span>
-                        </div>
-                        <hr class="my-1">
-                        <div class="d-flex justify-content-between fs-6 fw-bold text-success">
-                            <span>Total:</span>
-                            <span id="totalText">₡0</span>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-success w-100 fw-bold" id="btnSubmitOrder" disabled>
-                        <i class="fas fa-paper-plane me-1"></i> Enviar a Cocina
-                    </button>
-                </form>
-            </div>
+        <div id="contenido-menu" class="p-6 text-center text-gray-500">
+            Selecciona una mesa para cargar el menú.
         </div>
+
     </div>
 </div>
+
 @endsection
 
 @push('scripts')
 <script>
-    let selectedMesaId = null;
-    let orderItems = [];
+document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById('comanda-overlay');
+    const contenidoMenu = document.getElementById('contenido-menu');
+    const ticket = document.getElementById('ticket-productos');
+    const mesaLabel = document.getElementById('mesa-seleccionada');
 
-    function selectTable(id_mesa, numero_mesa, estado) {
-        selectedMesaId = id_mesa;
-        $('#inputMesaId').val(id_mesa);
-        $('#currentMesaTitle').text(`Mesa ${numero_mesa}`);
-        $('#selectedTableBadge').text(`Mesa ${numero_mesa} (${estado})`);
+    let mesaActual = null;
+    let pedido = {};
 
-        $('.btn-select-table').removeClass('border-primary shadow');
-        $(`#mesa-card-${id_mesa}`).addClass('border-primary shadow');
+    const formatoCRC = valor =>
+        '₡' + Number(valor).toLocaleString('es-CR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
 
-        checkSubmitButton();
+    function abrirModal() {
+        overlay.classList.add('activa');
+        overlay.setAttribute('aria-hidden', 'false');
     }
 
-    function addToOrder(id_producto, nombre_producto, precio) {
-        if (!selectedMesaId) {
-            alert('Por favor selecciona una mesa primero.');
+    function cerrarModal() {
+        overlay.classList.remove('activa');
+        overlay.setAttribute('aria-hidden', 'true');
+    }
+
+    // Seleccionar mesa y cargar el menú con fetch/AJAX
+    document.addEventListener('click', async event => {
+        const mesa = event.target.closest('.mesa-card');
+
+        if (mesa) {
+            mesaActual = {
+                id: mesa.dataset.mesaId,
+                numero: mesa.dataset.mesaNumero
+            };
+
+            document.querySelectorAll('.mesa-card').forEach(card => {
+                card.classList.toggle('seleccionada', card === mesa);
+            });
+
+            mesaLabel.textContent = mesaActual.numero;
+            abrirModal();
+
+            contenidoMenu.textContent = 'Cargando menú...';
+
+            try {
+                const url = @json(url('/mesero/mesas')) + '/' +
+                    encodeURIComponent(mesaActual.id) + '/productos';
+
+                const respuesta = await fetch(url, {
+                    headers: {
+                        'Accept': 'text/html',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!respuesta.ok) {
+                    throw new Error('Error HTTP ' + respuesta.status);
+                }
+
+                contenidoMenu.innerHTML = await respuesta.text();
+
+            } catch (error) {
+                contenidoMenu.textContent =
+                    'No se pudo cargar el menú. Inténtalo nuevamente.';
+                console.error(error);
+            }
+
             return;
         }
 
-        const item = orderItems.find(i => i.id_producto === id_producto);
-        if (item) {
-            item.cantidad++;
-        } else {
-            orderItems.push({ id_producto, nombre_producto, precio: parseFloat(precio), cantidad: 1 });
+        // Cerrar desde el botón de la ventana
+        if (event.target.closest('#cerrar-menu')) {
+            cerrarModal();
         }
+    });
 
-        renderOrder();
-    }
-
-    function changeQty(id_producto, delta) {
-        const item = orderItems.find(i => i.id_producto === id_producto);
-        if (!item) return;
-
-        item.cantidad += delta;
-        if (item.cantidad <= 0) {
-            orderItems = orderItems.filter(i => i.id_producto !== id_producto);
+    // Cerrar al pulsar fuera del contenido
+    overlay.addEventListener('click', event => {
+        if (event.target === overlay) {
+            cerrarModal();
         }
-        renderOrder();
-    }
+    });
 
-    function renderOrder() {
-        const tbody = $('#orderItemsBody');
-        const hiddenInputsContainer = $('#hiddenItemsInputs');
+    // Cerrar con Escape
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            cerrarModal();
+        }
+    });
 
-        tbody.empty();
-        hiddenInputsContainer.empty();
+    // Agregar un producto al ticket
+    overlay.addEventListener('click', event => {
+        const boton = event.target.closest('.comanda-agregar');
 
-        if (orderItems.length === 0) {
-            tbody.append(`
-                <tr id="emptyRow">
-                    <td colspan="4" class="text-center text-muted py-4 small">
-                        Selecciona una mesa y agrega productos a la comanda.
-                    </td>
-                </tr>
-            `);
-            updateTotals(0);
-            checkSubmitButton();
+        if (!boton) return;
+
+        const id = boton.dataset.id;
+        const nombre = boton.dataset.nombre;
+        const precio = Number(boton.dataset.precio);
+
+        if (!id || !nombre || !Number.isFinite(precio) || precio < 0) {
             return;
         }
 
+        if (!pedido[id]) {
+            pedido[id] = {
+                id: id,
+                nombre: nombre,
+                precio: precio,
+                cantidad: 0
+            };
+        }
+
+        pedido[id].cantidad++;
+
+        renderTicket();
+        cerrarModal();
+    });
+
+    // Dibujar el ticket y calcular los importes
+    function renderTicket() {
+        ticket.replaceChildren();
+
+        const productos = Object.values(pedido);
         let subtotal = 0;
 
-        orderItems.forEach((item, index) => {
-            const totalItem = item.precio * item.cantidad;
-            subtotal += totalItem;
-
-            tbody.append(`
-                <tr>
-                    <td><span class="badge bg-secondary">${item.cantidad}</span></td>
-                    <td class="small fw-bold">${item.nombre_producto}</td>
-                    <td class="text-end small">₡${totalItem.toLocaleString('es-CR')}</td>
-                    <td class="text-center">
-                        <button type="button" class="btn btn-sm btn-outline-success py-0 px-1" onclick="changeQty(${item.id_producto}, 1)">+</button>
-                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="changeQty(${item.id_producto}, -1)">-</button>
-                    </td>
-                </tr>
-            `);
-
-            hiddenInputsContainer.append(`
-                <input type="hidden" name="items[${index}][id_producto]" value="${item.id_producto}">
-                <input type="hidden" name="items[${index}][cantidad]" value="${item.cantidad}">
-                <input type="hidden" name="items[${index}][precio]" value="${item.precio}">
-            `);
-        });
-
-        updateTotals(subtotal);
-        checkSubmitButton();
-    }
-
-    function updateTotals(subtotal) {
-        const servicio = subtotal * 0.10;
-        const iva = subtotal * 0.13;
-        const total = subtotal + servicio + iva;
-
-        $('#subtotalText').text(`₡${subtotal.toLocaleString('es-CR')}`);
-        $('#servicioText').text(`₡${servicio.toLocaleString('es-CR')}`);
-        $('#ivaText').text(`₡${iva.toLocaleString('es-CR')}`);
-        $('#totalText').text(`₡${total.toLocaleString('es-CR')}`);
-    }
-
-    function checkSubmitButton() {
-        $('#btnSubmitOrder').prop('disabled', !(selectedMesaId && orderItems.length > 0));
-    }
-
-    function clearOrder() {
-        if (orderItems.length > 0 && confirm('¿Desea vaciar la comanda actual?')) {
-            orderItems = [];
-            renderOrder();
+        if (productos.length === 0) {
+            const vacio = document.createElement('p');
+            vacio.className = 'text-center text-gray-500 py-8';
+            vacio.textContent = 'Agrega productos a la comanda.';
+            ticket.appendChild(vacio);
         }
-    }
 
-    $('#searchProduct').on('keyup', function () {
-        const value = $(this).val().toLowerCase();
+        productos.forEach(producto => {
+            subtotal += producto.precio * producto.cantidad;
 
-        $('#productsGrid .product-item').filter(function () {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+            const fila = document.createElement('div');
+            fila.className = 'ticket-item';
+
+            const encabezado = document.createElement('div');
+            encabezado.className = 'flex justify-between gap-2';
+
+            const nombre = document.createElement('span');
+            nombre.className = 'font-medium';
+            nombre.textContent = producto.nombre;
+
+            const importe = document.createElement('span');
+            importe.className = 'font-semibold whitespace-nowrap';
+            importe.textContent = formatoCRC(
+                producto.precio * producto.cantidad
+            );
+
+            encabezado.append(nombre, importe);
+
+            const controles = document.createElement('div');
+            controles.className = 'ticket-cantidad mt-2';
+
+            const menos = document.createElement('button');
+            menos.type = 'button';
+            menos.textContent = '−';
+            menos.setAttribute('aria-label', 'Disminuir cantidad');
+            menos.addEventListener('click', () => {
+                producto.cantidad--;
+
+                if (producto.cantidad <= 0) {
+                    delete pedido[producto.id];
+                }
+
+                renderTicket();
+            });
+
+            const cantidad = document.createElement('span');
+            cantidad.textContent = 'Cantidad: ' + producto.cantidad;
+
+            const mas = document.createElement('button');
+            mas.type = 'button';
+            mas.textContent = '+';
+            mas.setAttribute('aria-label', 'Aumentar cantidad');
+            mas.addEventListener('click', () => {
+                producto.cantidad++;
+                renderTicket();
+            });
+
+            controles.append(menos, cantidad, mas);
+            fila.append(encabezado, controles);
+            ticket.appendChild(fila);
         });
-    });
+
+        // No se aplica impuesto hasta definir la tasa del restaurante
+        const impuestos = 0;
+        const total = subtotal + impuestos;
+
+        document.getElementById('ticket-subtotal').textContent =
+            formatoCRC(subtotal);
+
+        document.getElementById('ticket-impuestos').textContent =
+            formatoCRC(impuestos);
+
+        document.getElementById('ticket-total').textContent =
+            formatoCRC(total);
+    }
+});
 </script>
 @endpush
