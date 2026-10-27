@@ -195,9 +195,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const contenidoMenu = document.getElementById('contenido-menu');
     const ticket = document.getElementById('ticket-productos');
     const mesaLabel = document.getElementById('mesa-seleccionada');
+    const btnRegistrar = document.getElementById('registrar-comanda');
 
     let mesaActual = null;
     let pedido = {};
+
+    // Token único por cada intento de comanda
+    function generarTokenIdempotencia() {
+        return 'token-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+    }
 
     const formatoCRC = valor =>
         '₡' + Number(valor).toLocaleString('es-CR', {
@@ -215,7 +221,6 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.setAttribute('aria-hidden', 'true');
     }
 
-    // Seleccionar mesa y cargar el menú con fetch/AJAX
     document.addEventListener('click', async event => {
         const mesa = event.target.closest('.mesa-card');
 
@@ -229,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.classList.toggle('seleccionada', card === mesa);
             });
 
-            mesaLabel.textContent = mesaActual.numero;
+            mesaLabel.textContent = 'Mesa ' + mesaActual.numero;
             abrirModal();
 
             contenidoMenu.textContent = 'Cargando menú...';
@@ -260,27 +265,23 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Cerrar desde el botón de la ventana
         if (event.target.closest('#cerrar-menu')) {
             cerrarModal();
         }
     });
 
-    // Cerrar al pulsar fuera del contenido
     overlay.addEventListener('click', event => {
         if (event.target === overlay) {
             cerrarModal();
         }
     });
 
-    // Cerrar con Escape
     document.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
             cerrarModal();
         }
     });
 
-    // Agregar un producto al ticket
     overlay.addEventListener('click', event => {
         const boton = event.target.closest('.comanda-agregar');
 
@@ -299,7 +300,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 id: id,
                 nombre: nombre,
                 precio: precio,
-                cantidad: 0
+                cantidad: 0,
+                notas: '' // Notas y modificadores libres para mongoDB
             };
         }
 
@@ -309,7 +311,6 @@ document.addEventListener('DOMContentLoaded', () => {
         cerrarModal();
     });
 
-    // Dibujar el ticket y calcular los importes
     function renderTicket() {
         ticket.replaceChildren();
 
@@ -319,78 +320,145 @@ document.addEventListener('DOMContentLoaded', () => {
         if (productos.length === 0) {
             const vacio = document.createElement('p');
             vacio.className = 'text-center text-gray-500 py-8';
-            vacio.textContent = 'Agrega productos a la comanda.';
+            vacio.innerHTML = '<i class="ti ti-shopping-cart text-4xl block mb-2"></i>Agrega productos a la comanda.';
             ticket.appendChild(vacio);
+
+            btnRegistrar.disabled = true;
+            btnRegistrar.className = 'w-full mt-6 rounded-lg bg-gray-300 text-gray-600 py-3 font-semibold cursor-not-allowed';
+        } else {
+            btnRegistrar.disabled = false;
+            btnRegistrar.className = 'w-full mt-6 rounded-lg bg-green-600 hover:bg-green-700 text-white py-3 font-semibold transition';
         }
 
-        productos.forEach(producto => {
+        productos.forEach((producto, index) => {
             subtotal += producto.precio * producto.cantidad;
 
             const fila = document.createElement('div');
-            fila.className = 'ticket-item';
+            fila.className = 'ticket-item mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200';
 
             const encabezado = document.createElement('div');
             encabezado.className = 'flex justify-between gap-2';
 
             const nombre = document.createElement('span');
-            nombre.className = 'font-medium';
+            nombre.className = 'font-medium text-sm text-gray-800';
             nombre.textContent = producto.nombre;
 
             const importe = document.createElement('span');
-            importe.className = 'font-semibold whitespace-nowrap';
-            importe.textContent = formatoCRC(
-                producto.precio * producto.cantidad
-            );
+            importe.className = 'font-semibold text-sm text-gray-900 whitespace-nowrap';
+            importe.textContent = formatoCRC(producto.precio * producto.cantidad);
 
             encabezado.append(nombre, importe);
 
+            const inputNota = document.createElement('input');
+            inputNota.type = 'text';
+            inputNota.placeholder = 'Notas libres (ej. sin cebolla, término medio)';
+            inputNota.className = 'w-full mt-2 text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-gray-900';
+            inputNota.value = producto.notas || '';
+            inputNota.addEventListener('input', (e) => {
+                producto.notas = e.target.value;
+            });
+
             const controles = document.createElement('div');
-            controles.className = 'ticket-cantidad mt-2';
+            controles.className = 'ticket-cantidad flex items-center justify-between mt-2 text-xs';
 
             const menos = document.createElement('button');
             menos.type = 'button';
+            menos.className = 'px-2 py-1 bg-gray-200 rounded text-gray-700 font-bold';
             menos.textContent = '−';
-            menos.setAttribute('aria-label', 'Disminuir cantidad');
             menos.addEventListener('click', () => {
                 producto.cantidad--;
-
                 if (producto.cantidad <= 0) {
                     delete pedido[producto.id];
                 }
-
                 renderTicket();
             });
 
             const cantidad = document.createElement('span');
+            cantidad.className = 'font-semibold text-gray-700';
             cantidad.textContent = 'Cantidad: ' + producto.cantidad;
 
             const mas = document.createElement('button');
             mas.type = 'button';
+            mas.className = 'px-2 py-1 bg-gray-200 rounded text-gray-700 font-bold';
             mas.textContent = '+';
-            mas.setAttribute('aria-label', 'Aumentar cantidad');
             mas.addEventListener('click', () => {
                 producto.cantidad++;
                 renderTicket();
             });
 
             controles.append(menos, cantidad, mas);
-            fila.append(encabezado, controles);
+            fila.append(encabezado, inputNota, controles);
             ticket.appendChild(fila);
         });
 
-        // No se aplica impuesto hasta definir la tasa del restaurante
         const impuestos = 0;
         const total = subtotal + impuestos;
 
-        document.getElementById('ticket-subtotal').textContent =
-            formatoCRC(subtotal);
-
-        document.getElementById('ticket-impuestos').textContent =
-            formatoCRC(impuestos);
-
-        document.getElementById('ticket-total').textContent =
-            formatoCRC(total);
+        document.getElementById('ticket-subtotal').textContent = formatoCRC(subtotal);
+        document.getElementById('ticket-impuestos').textContent = formatoCRC(impuestos);
+        document.getElementById('ticket-total').textContent = formatoCRC(total);
     }
+
+    // =======================================================
+    // ENVIAR COMANDA A LARAVEL (SQL SERVER + MONGODB)
+    // =======================================================
+    btnRegistrar.addEventListener('click', async () => {
+        if (!mesaActual || Object.keys(pedido).length === 0) {
+            alert('Por favor selecciona una mesa y agrega productos a la comanda.');
+            return;
+        }
+
+        btnRegistrar.disabled = true;
+        btnRegistrar.textContent = 'Procesando y guardando...';
+
+        // Mapear los detalles para enviar a SQL Server y MongoDB
+        const detalles = Object.values(pedido).map((p, idx) => ({
+            num_linea: idx + 1,
+            id_producto: p.id,
+            cantidad: p.cantidad,
+            notas: p.notas || ''
+        }));
+
+        const payload = {
+            token_idempotencia: generarTokenIdempotencia(),
+            id_mesa: mesaActual.id,
+            id_empleado: 1, // ID del empleado actual
+            observaciones: 'Comanda tomada desde interfaz de Mesero',
+            detalles: detalles
+        };
+
+        try {
+            const respuesta = await fetch("{{ route('mesero.guardar') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json', // <--- ¡AQUÍ ESTABA EL ERROR! Debe ser application/json
+                    'X-CSRF-TOKEN': "{{ csrf_token() }}",
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const resultado = await respuesta.json();
+
+            if (respuesta.ok && resultado.success) {
+                alert('¡Comanda #' + resultado.id_pedido + ' registrada con éxito en SQL Server y MongoDB!');
+
+                // Limpiar ticket y refrescar la vista
+                pedido = {};
+                renderTicket();
+                window.location.reload();
+            } else {
+                alert('Error al registrar la comanda: ' + (resultado.error || resultado.message));
+                btnRegistrar.disabled = false;
+                btnRegistrar.textContent = 'Registrar comanda';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Ocurrió un error de red al comunicarse con el servidor.');
+            btnRegistrar.disabled = false;
+            btnRegistrar.textContent = 'Registrar comanda';
+        }
+    });
 });
 </script>
 @endpush
