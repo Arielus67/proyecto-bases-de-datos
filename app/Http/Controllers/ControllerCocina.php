@@ -2,102 +2,129 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Pedido;
+use App\Models\Producto;
 use App\Models\ComandaNoSql;
 use App\Models\TiempoCocinaNoSql;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ControllerCocina extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        // Mantiene tu lógica original consultando la base relacional de SQL Server
-        $pedidos = Pedido::with(['mesa', 'detalles.producto'])
-            ->whereIn('estado', ['ABIERTO', 'PENDIENTE', 'EN_PREPARACION'])
-            ->orderBy('fecha_hora')
+        // Consultar comandas activas directamente desde la colección de MongoDB
+        $comandas = ComandaNoSql::whereIn('estado', ['ABIERTO', 'EN_PREPARACION'])
+            ->orderBy('created_at', 'asc')
             ->get();
 
-        return view('modules.cocina.index', compact('pedidos'));
+        // Reunir los IDs de producto de todas las comandas
+        $idsProductos = $comandas
+            ->flatMap(fn ($c) => collect($c->detalles_con_modificadores)->pluck('id_producto'))
+            ->unique()
+            ->values()
+            ->all();
+
+        // Buscar los nombres en SQL Server: [id_producto => nombre_producto]
+        $nombresProductos = [];
+
+        if (!empty($idsProductos)) {
+            $nombresProductos = Producto::whereIn('id_producto', $idsProductos)
+                ->pluck('nombre_producto', 'id_producto')
+                ->toArray();
+        }
+
+        return view('modules.cocina.index', compact('comandas', 'nombresProductos'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
         //
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         //
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(string $id)
     {
         //
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(string $id)
     {
         //
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, string $id)
     {
-        // Actualizar el estado de la cocina tanto en SQL como en MongoDB (tiempos de cocina)
-        $nuevoEstado = $request->input('estado_cocina'); // EJ: 'EN_PREPARACION', 'LISTO'
-        $idProducto = $request->input('id_producto'); // Opcional, si se actualiza por plato o línea
+        // Soportar tanto 'estado' (enviado por la vista KDS) como 'estado_cocina'
+        $nuevoEstado = $request->input('estado') ?? $request->input('estado_cocina');
+        $idProducto = $request->input('id_producto');
 
-        // 1. Actualizamos de manera flexible en MongoDB la comanda principal (tiempos y estado)
-        $comandaMongo = ComandaNoSql::where('id_pedido_sql', $id)->first();
+        if (!in_array($nuevoEstado, ['EN_PREPARACION', 'LISTO'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Estado no válido.'
+            ], 422);
+        }
 
-        if ($comandaMongo) {
+        // Buscar la comanda en MongoDB (por _id o por id_pedido_sql)
+        $comandaMongo = ComandaNoSql::where('_id', $id)->first()
+                        ?? ComandaNoSql::where('id_pedido_sql', (int) $id)->first();
+
+        if (!$comandaMongo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró la comanda.'
+            ], 404);
+        }
+
+        try {
+            $idPedidoSql = (int) $comandaMongo->id_pedido_sql;
+
+            // 1. Actualizar primero SQL Server (tabla PEDIDO usa id_pedido, no id)
+            DB::connection('sqlsrv')
+                ->table('PEDIDO')
+                ->where('id_pedido', $idPedidoSql)
+                ->update(['estado' => $nuevoEstado]);
+
+            // 2. Actualizar MongoDB (estado y tiempos)
             $comandaMongo->estado = $nuevoEstado;
 
             $tiempos = $comandaMongo->tiempos_cocina ?? [];
-            if ($nuevoEstado == 'EN_PREPARACION') {
+            if ($nuevoEstado === 'EN_PREPARACION') {
                 $tiempos['preparando_at'] = now();
-            } elseif ($nuevoEstado == 'LISTO') {
+            } elseif ($nuevoEstado === 'LISTO') {
                 $tiempos['listo_at'] = now();
             }
             $comandaMongo->tiempos_cocina = $tiempos;
             $comandaMongo->save();
+
+            // 3. Registrar el evento de rendimiento en 'tiempos_cocina'
+            TiempoCocinaNoSql::create([
+                'id_pedido_sql' => $idPedidoSql,
+                'id_producto' => $idProducto ? (int) $idProducto : null,
+                'tiempo_espera_minutos' => now()->diffInMinutes($comandaMongo->created_at ?? now()),
+                'estado_etapa' => $nuevoEstado,
+                'registrado_at' => now()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Estado de cocina actualizado correctamente'
+            ]);
+
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
-
-        // 2. Registramos el evento de rendimiento en la colección específica 'tiempos_cocina' (Exigido en la guía)
-        TiempoCocinaNoSql::create([
-            'id_pedido_sql' => (int) $id,
-            'id_producto' => $idProducto ? (int) $idProducto : null,
-            'tiempo_espera_minutos' => now()->diffInMinutes($comandaMongo->created_at ?? now()),
-            'estado_etapa' => $nuevoEstado,
-            'registrado_at' => now()
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Estado de cocina y tiempos en MongoDB actualizados correctamente'
-        ]);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id)
     {
         //

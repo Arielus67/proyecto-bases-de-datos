@@ -1,0 +1,382 @@
+/* ==============================
+   ANCHO COMPLETO (anula límites del tema)
+============================== */
+
+#main-wrapper {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.page-wrapper {
+    flex: 1 1 0% !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
+/* ==============================
+   ENCABEZADO DEL MÓDULO
+============================== */
+
+.kds-top {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100% !important;
+    margin-bottom: 20px;
+}
+
+.kds-top-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.kds-top-icono {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: #0f172a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.kds-top-icono i {
+    font-size: 26px;
+    color: #fff;
+}
+
+.kds-titulo {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 2px;
+}
+
+.kds-subtitulo {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0;
+}
+
+.kds-btn-actualizar {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 10px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color .2s ease;
+}
+
+.kds-btn-actualizar:hover {
+    background: #1d4ed8;
+}
+
+.kds-btn-actualizar i {
+    font-size: 18px;
+    color: #fff;
+}
+
+/* ==============================
+   CUADRÍCULA DE COMANDAS
+============================== */
+
+.kds-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+    gap: 20px;
+    width: 100% !important;
+    max-width: none !important;
+}
+
+/* ==============================
+   TARJETA DE COMANDA
+============================== */
+
+.kds-card {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
+    overflow: hidden;
+    transition: box-shadow .2s ease;
+}
+
+.kds-card:hover {
+    box-shadow: 0 6px 18px rgb(15 23 42 / 12%);
+}
+
+.kds-card.estado-abierto {
+    border-top: 4px solid #eab308;
+}
+
+.kds-card.estado-preparacion {
+    border-top: 4px solid #3b82f6;
+}
+
+/* Cabecera oscura */
+.kds-card-header {
+    background: #0f172a;
+    padding: 20px;
+}
+
+.kds-card-header * {
+    color: #fff;
+}
+
+.kds-header-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.kds-mesa-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.kds-mesa-info i {
+    font-size: 28px;
+    color: #9ca3af;
+}
+
+.kds-etiqueta {
+    display: block;
+    font-size: 11px;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: #9ca3af !important;
+}
+
+.kds-mesa-nombre {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    color: #fff !important;
+}
+
+.kds-pedido {
+    text-align: right;
+}
+
+.kds-pedido-num {
+    font-family: monospace;
+    font-size: 16px;
+    font-weight: 700;
+    color: #facc15 !important;
+}
+
+.kds-header-pie {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #475569;
+    margin-top: 16px;
+    padding-top: 12px;
+    font-size: 13px;
+}
+
+.kds-hora {
+    color: #d1d5db !important;
+}
+
+/* Badges de estado */
+.kds-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+}
+
+.kds-card-header .kds-badge.badge-abierto {
+    background: #fef9c3;
+    color: #854d0e;
+}
+
+.kds-card-header .kds-badge.badge-preparacion {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* Cuerpo */
+.kds-card-body {
+    flex: 1;
+    padding: 20px;
+}
+
+.kds-body-titulo {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: #6b7280;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 8px;
+    margin: 0 0 12px;
+}
+
+.kds-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.kds-item {
+    padding: 12px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+}
+
+.kds-item-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.kds-cantidad {
+    padding: 2px 10px;
+    border-radius: 6px;
+    background: #e5e7eb;
+    color: #111827;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.kds-nota {
+    margin: 8px 0 0;
+    padding: 6px 8px;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    background: #fef2f2;
+    color: #dc2626;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Pie con botón */
+.kds-card-footer {
+    padding: 16px 20px;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+}
+
+.kds-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    border: 0;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color .2s ease;
+}
+
+.kds-btn i {
+    font-size: 18px;
+    color: #fff;
+}
+
+.kds-btn-iniciar {
+    background: #eab308;
+}
+
+.kds-btn-iniciar:hover {
+    background: #ca8a04;
+}
+
+.kds-btn-listo {
+    background: #16a34a;
+}
+
+.kds-btn-listo:hover {
+    background: #15803d;
+}
+
+.kds-btn:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+/* Estado vacío */
+.kds-vacio {
+    grid-column: 1 / -1;
+    padding: 48px 20px;
+    text-align: center;
+    background: #fff;
+    border: 1px dashed #d1d5db;
+    border-radius: 14px;
+    color: #6b7280;
+}
+
+.kds-vacio i {
+    display: block;
+    font-size: 48px;
+    color: #9ca3af;
+    margin-bottom: 12px;
+}
+
+.kds-vacio-titulo {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+}
+
+.kds-vacio-texto {
+    font-size: 14px;
+    margin: 4px 0 0;
+}
+
+/* ==============================
+   MENÚ LATERAL NEGRO
+============================== */
+
+#sidebar-menu {
+    background-color: #0b1020 !important;
+    color: #fff !important;
+    border-color: #272f3d !important;
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+
+@media (max-width: 700px) {
+    .kds-top {
+        flex-direction: column !important;
+        align-items: flex-start;
+    }
+
+    .kds-grid {
+        grid-template-columns: 1fr !important;
+    }
+}

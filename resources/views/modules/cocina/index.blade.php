@@ -1,111 +1,151 @@
 @extends('app')
 
-@section('titulo', 'Pantalla de Cocina - Pedidos Pendientes')
+@section('titulo', 'KDS - Pantalla de Cocina')
 
-@section('botones')
-    <button type="button" class="btn btn-light btn-sm fw-bold" onclick="location.reload()">
-        <i class="fas fa-sync-alt me-1"></i> Actualizar Pantalla
-    </button>
-@endsection
+@push('css')
+    <link rel="stylesheet" href="{{ asset('css/cocina.css') }}?v={{ time() }}">
+@endpush
 
 @section('contenido')
-<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
-    
-    {{-- Iteramos sobre los pedidos que la BD indique que están pendientes/en preparación --}}
-    @forelse($pedidos as $pedido)
-        <div class="col">
-            {{-- Cambiamos el color del borde superior dependiendo del estado del pedido --}}
-            <div class="card h-100 shadow-sm border-0 border-top border-4 {{ $pedido->estado == 'EN_PREPARACION' ? 'border-info' : 'border-warning' }}">
-                
-                {{-- Cabecera del Ticket --}}
-                <div class="card-header bg-white d-flex justify-content-between align-items-center border-bottom-0 pt-3">
-                    <h5 class="mb-0 fw-bold text-dark">
-                        <i class="fas fa-hashtag me-1 text-muted"></i>{{ $pedido->id_pedido }}
-                    </h5>
-                    <span class="badge {{ $pedido->estado == 'EN_PREPARACION' ? 'bg-info' : 'bg-warning text-dark' }} fs-6">
-                        Mesa {{ $pedido->mesa->numero_mesa ?? 'N/A' }}
+
+{{-- ENCABEZADO DEL MÓDULO --}}
+<div class="kds-top">
+    <div class="kds-top-info">
+        <div class="kds-top-icono">
+            <i class="ti ti-tools-kitchen-2"></i>
+        </div>
+        <div>
+            <h2 class="kds-titulo">Kitchen Display System (KDS)</h2>
+            <p class="kds-subtitulo">Gestión de comandas en tiempo real desde MongoDB</p>
+        </div>
+    </div>
+
+    <button type="button" onclick="window.location.reload()" class="kds-btn-actualizar">
+        <i class="ti ti-rotate-clockwise"></i>
+        Actualizar Pantalla
+    </button>
+</div>
+
+{{-- CUADRÍCULA DE COMANDAS --}}
+<div class="kds-grid">
+    @forelse($comandas as $comanda)
+        @php
+            $esAbierto = $comanda->estado === 'ABIERTO';
+            $claseCard = $esAbierto ? 'estado-abierto' : 'estado-preparacion';
+            $claseBadge = $esAbierto ? 'badge-abierto' : 'badge-preparacion';
+        @endphp
+
+        <div class="kds-card {{ $claseCard }}">
+
+            {{-- Cabecera --}}
+            <div class="kds-card-header">
+                <div class="kds-header-fila">
+                    <div class="kds-mesa-info">
+                        <i class="ti ti-armchair"></i>
+                        <div>
+                            <span class="kds-etiqueta">Mesa</span>
+                            <h3 class="kds-mesa-nombre">Mesa {{ $comanda->id_mesa }}</h3>
+                        </div>
+                    </div>
+
+                    <div class="kds-pedido">
+                        <span class="kds-etiqueta">Pedido SQL</span>
+                        <span class="kds-pedido-num">#{{ $comanda->id_pedido_sql }}</span>
+                    </div>
+                </div>
+
+                <div class="kds-header-pie">
+                    <span class="kds-badge {{ $claseBadge }}">
+                        {{ str_replace('_', ' ', $comanda->estado) }}
+                    </span>
+                    <span class="kds-hora">
+                        <i class="ti ti-clock"></i> {{ $comanda->created_at->format('H:i:s') }}
                     </span>
                 </div>
-                
-                <div class="card-body pt-2 pb-0">
-                    <div class="d-flex justify-content-between small text-muted mb-3">
-                        <span><i class="fas fa-clock me-1"></i> {{ \Carbon\Carbon::parse($pedido->fecha_hora)->format('h:i A') }}</span>
-                        <span><i class="fas fa-user me-1"></i> Mesero ID: {{ $pedido->id_empleado }}</span>
-                    </div>
-
-                    {{-- Lista de Platillos a preparar --}}
-                    <div class="table-responsive">
-                        <table class="table table-sm table-borderless mb-0">
-                            <tbody>
-                                @foreach($pedido->detalles as $detalle)
-                                    <tr class="border-bottom">
-                                        <td class="fw-bold fs-5 text-center align-middle" style="width: 15%;">
-                                            {{ $detalle->cantidad }}x
-                                        </td>
-                                        <td class="align-middle">
-                                            <span class="fw-bold">{{ $detalle->producto->nombre_producto ?? 'Producto Desconocido' }}</span>
-                                            
-                                            {{-- Notas especiales para el cocinero --}}
-                                            @if($detalle->notas)
-                                                <div class="text-danger small fw-bold mt-1">
-                                                    <i class="fas fa-exclamation-circle me-1"></i> {{ $detalle->notas }}
-                                                </div>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {{-- Observaciones generales del pedido (si existen) --}}
-                    @if($pedido->observaciones)
-                        <div class="alert alert-light border border-danger text-danger mt-3 mb-0 p-2 small fw-bold">
-                            <i class="fas fa-comment-dots me-1"></i> Nota General: {{ $pedido->observaciones }}
-                        </div>
-                    @endif
-                </div>
-
-                {{-- Acciones del Cocinero --}}
-                <div class="card-footer bg-white border-top-0 pb-3 pt-3">
-                    <form action="{{ route('cocina.update', $pedido->id_pedido) }}" method="POST">
-                        @csrf
-                        @method('PUT')
-                        
-                        @if($pedido->estado == 'ABIERTO' || $pedido->estado == 'PENDIENTE')
-                            <input type="hidden" name="nuevo_estado" value="EN_PREPARACION">
-                            <button type="submit" class="btn btn-info w-100 fw-bold text-white">
-                                <i class="fas fa-fire me-1"></i> Empezar a Preparar
-                            </button>
-                        @else
-                            <input type="hidden" name="nuevo_estado" value="LISTO">
-                            <button type="submit" class="btn btn-success w-100 fw-bold">
-                                <i class="fas fa-check-circle me-1"></i> Marcar como Listo
-                            </button>
-                        @endif
-                    </form>
-                </div>
-
             </div>
+
+            {{-- Cuerpo --}}
+            <div class="kds-card-body">
+                <h4 class="kds-body-titulo">Productos solicitados</h4>
+
+                <ul class="kds-lista">
+                    @foreach($comanda->detalles_con_modificadores as $detalle)
+                        <li class="kds-item">
+                            <div class="kds-item-fila">
+                                <span>{{ $nombresProductos[$detalle['id_producto']] ?? 'Producto #' . $detalle['id_producto'] }}</span>
+                                <span class="kds-cantidad">x{{ $detalle['cantidad'] }}</span>
+                            </div>
+
+                            @if(!empty($detalle['notas']))
+                                <p class="kds-nota">
+                                    <i class="ti ti-alert-circle"></i> Nota: {{ $detalle['notas'] }}
+                                </p>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+
+            {{-- Acción --}}
+            <div class="kds-card-footer">
+                @if($comanda->estado === 'ABIERTO')
+                    <button type="button"
+                        onclick="cambiarEstado(this, '{{ $comanda->_id }}', 'EN_PREPARACION')"
+                        class="kds-btn kds-btn-iniciar">
+                        <i class="ti ti-flame"></i>
+                        Iniciar Preparación
+                    </button>
+                @elseif($comanda->estado === 'EN_PREPARACION')
+                    <button type="button"
+                        onclick="cambiarEstado(this, '{{ $comanda->_id }}', 'LISTO')"
+                        class="kds-btn kds-btn-listo">
+                        <i class="ti ti-check"></i>
+                        Marcar como Listo
+                    </button>
+                @endif
+            </div>
+
         </div>
     @empty
-        <div class="col-12">
-            <div class="alert alert-success text-center shadow-sm py-5 mt-4">
-                <i class="fas fa-utensilios fa-3x mb-3 text-success d-block"></i>
-                <h4 class="fw-bold mb-1">¡Excelente trabajo!</h4>
-                <p class="mb-0 text-muted">No hay pedidos pendientes en la cola de cocina.</p>
-            </div>
+        <div class="kds-vacio">
+            <i class="ti ti-coffee"></i>
+            <p class="kds-vacio-titulo">No hay comandas pendientes</p>
+            <p class="kds-vacio-texto">Las nuevas comandas aparecerán aquí automáticamente en tiempo real.</p>
         </div>
     @endforelse
-
 </div>
+
 @endsection
 
 @push('scripts')
 <script>
-    // Refrescar la página automáticamente cada 30 segundos para ver nuevos pedidos
-    setTimeout(function() {
-        location.reload();
-    }, 30000);
+    async function cambiarEstado(boton, idComanda, nuevoEstado) {
+        boton.disabled = true;
+
+        try {
+            const respuesta = await fetch(`/cocina/actualizar-estado/${idComanda}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': "{{ csrf_token() }}",
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ estado: nuevoEstado })
+            });
+
+            const resultado = await respuesta.json();
+
+            if (respuesta.ok && resultado.success) {
+                window.location.reload();
+            } else {
+                alert('Error al actualizar el estado: ' + (resultado.message || 'Error desconocido'));
+                boton.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Ocurrió un error de red al comunicarse con el servidor.');
+            boton.disabled = false;
+        }
+    }
 </script>
 @endpush

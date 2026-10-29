@@ -3,186 +3,100 @@
 @section('titulo', 'Gestión de Comandas')
 
 @push('css')
-    <link rel="stylesheet" href="{{ asset('css/comandas.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/comandas.css') }}?v={{ time() }}">
 @endpush
 
 @section('contenido')
 
-{{-- CONTENEDOR: MESAS A LA IZQUIERDA, TICKET A LA DERECHA --}}
-<div style="display:grid;
-            grid-template-columns:minmax(0, 1fr) 360px;
-            gap:24px;
-            align-items:start;
-            width:100%;">
+<div class="comandas-layout">
 
-    {{-- =========================================
-         IZQUIERDA: TARJETAS DE MESAS
-    ========================================== --}}
-    <section style="min-width:0;">
+    {{-- MESAS --}}
+    <section class="comandas-mesas">
+        <h2 class="mesas-titulo">Mesas del restaurante</h2>
+        <p class="mesas-subtitulo">Selecciona una mesa para agregar productos.</p>
 
-        <div class="mb-5">
-            <h2 class="text-xl font-semibold">Mesas del restaurante</h2>
-            <p class="text-sm text-gray-500">
-                Selecciona una mesa para agregar productos.
-            </p>
-        </div>
-
-        <div style="display:grid;
-                    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-                    gap:16px;">
-
+        <div class="mesas-grid">
             @forelse ($mesas as $mesa)
-
-                @php
-                    $estado = strtoupper($mesa->estado ?? '');
-
-                    $colores = [
-                        'DISPONIBLE' => 'bg-green-100 text-green-700',
-                        'OCUPADA' => 'bg-red-100 text-red-700',
-                        'RESERVADA' => 'bg-yellow-100 text-yellow-700',
-                        'MANTENIMIENTO' => 'bg-gray-100 text-gray-700',
-                    ];
-
-                    $color = $colores[$estado] ?? 'bg-gray-100 text-gray-600';
-                @endphp
-
                 <button type="button"
                     class="mesa-card"
                     data-mesa-id="{{ $mesa->id_mesa }}"
                     data-mesa-numero="{{ $mesa->numero_mesa }}"
                     aria-label="Seleccionar mesa {{ $mesa->numero_mesa }}">
 
-                    <div class="flex justify-between items-center mb-4">
-                        <i class="ti ti-armchair text-3xl text-gray-700"></i>
-
-                        <span class="text-xs font-semibold rounded-full px-2 py-1 {{ $color }}">
-                            {{ $estado }}
-                        </span>
+                    <div class="mesa-top">
+                        <i class="ti ti-armchair"></i>
+                        <span class="mesa-estado">{{ strtoupper($mesa->estado ?? '') }}</span>
                     </div>
 
-                    <h3 class="text-lg font-bold">
-                        Mesa {{ $mesa->numero_mesa }}
-                    </h3>
-
-                    <p class="text-sm text-gray-500 mt-1">
-                        {{ $mesa->zona ?: 'Sin zona' }}
-                    </p>
-
-                    <p class="text-sm text-gray-500 mt-2">
+                    <h3 class="mesa-nombre">Mesa {{ $mesa->numero_mesa }}</h3>
+                    <p class="mesa-zona">{{ $mesa->zona ?: 'Sin zona' }}</p>
+                    <p class="mesa-cap">
                         <i class="ti ti-users"></i>
-                        {{ $mesa->capacidad }}
-                        {{ $mesa->capacidad == 1 ? 'persona' : 'personas' }}
+                        {{ $mesa->capacidad }} {{ $mesa->capacidad == 1 ? 'persona' : 'personas' }}
                     </p>
-
                 </button>
-
             @empty
-
-                <div class="border rounded-xl p-8 text-center">
-                    <i class="ti ti-armchair text-4xl text-gray-400"></i>
-                    <p class="font-semibold mt-2">No hay mesas registradas</p>
+                <div style="border:1px solid #e5e7eb;border-radius:12px;padding:32px;text-align:center;">
+                    <i class="ti ti-armchair" style="font-size:36px;color:#9ca3af;"></i>
+                    <p style="font-weight:600;margin-top:8px;">No hay mesas registradas</p>
                 </div>
-
             @endforelse
-
         </div>
     </section>
 
-    {{-- =========================================
-         DERECHA: TICKET DE COMANDA
-    ========================================== --}}
-    <aside style="width:100%;min-width:0;position:sticky;top:20px;">
-
-        <div class="bg-white border rounded-xl shadow-sm overflow-hidden">
-
-            <div class="bg-gray-900 text-white p-5">
-                <div class="flex items-center gap-3">
-                    <i class="ti ti-receipt text-3xl"></i>
-
-                    <div>
-                        <h2 class="text-lg font-bold">Comanda actual</h2>
-                        <p class="text-sm text-gray-300">
-                            Detalle del pedido
-                        </p>
-                    </div>
-                </div>
-
-                <div class="border-t border-gray-700 mt-4 pt-3 flex justify-between text-sm">
-                    <span>Fecha</span>
-                    <span>{{ now()->format('d/m/Y H:i') }}</span>
-                </div>
+    {{-- TICKET --}}
+    <aside class="ticket-panel">
+        <div class="ticket-header">
+            <div class="ticket-header-top">
+                <i class="ti ti-receipt"></i>
+                <h2>Detalle del pedido</h2>
             </div>
+            <div class="ticket-fecha">
+                <span>Fecha</span>
+                <span>{{ now()->format('d/m/Y H:i') }}</span>
+            </div>
+        </div>
 
-            <div class="p-5">
+        <div class="ticket-body">
+            <span class="ticket-label">Mesa seleccionada</span>
+            <p id="mesa-seleccionada" class="ticket-mesa">Ninguna</p>
 
-                <div class="mb-4">
-                    <span class="text-sm text-gray-500">Mesa seleccionada</span>
-                    <p id="mesa-seleccionada" class="font-semibold">
-                        Ninguna
-                    </p>
-                </div>
+            <h3 class="ticket-subtitulo">Productos</h3>
 
-                <h3 class="font-semibold mb-3">Productos</h3>
-
-                <div id="ticket-productos">
-                    <p class="text-center text-gray-500 py-8">
-                        <i class="ti ti-shopping-cart text-4xl"></i>
-                        <span class="block mt-2">
-                            Selecciona una mesa y agrega productos.
-                        </span>
-                    </p>
-                </div>
-
-                <div class="space-y-3 mt-5 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">Subtotal</span>
-                        <span id="ticket-subtotal">₡0,00</span>
-                    </div>
-
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">Impuestos</span>
-                        <span id="ticket-impuestos">₡0,00</span>
-                    </div>
-
-                    <div class="border-t pt-3 flex justify-between text-lg font-bold">
-                        <span>Total</span>
-                        <span id="ticket-total">₡0,00</span>
-                    </div>
-                </div>
-
-                <button type="button"
-                    id="registrar-comanda"
-                    disabled
-                    class="w-full mt-6 rounded-lg bg-gray-300 text-gray-600 py-3 font-semibold">
-                    Registrar comanda
-                </button>
-
-                <p class="text-xs text-gray-400 text-center mt-3">
-                    El pedido todavía no se guarda en la base de datos.
+            <div id="ticket-productos">
+                <p style="text-align:center;color:#6b7280;padding:32px 0;">
+                    <i class="ti ti-shopping-cart" style="font-size:36px;"></i>
+                    <span style="display:block;margin-top:8px;">Selecciona una mesa y agrega productos.</span>
                 </p>
-
             </div>
+
+            <div class="ticket-fila">
+                <span class="gris">Subtotal</span>
+                <span id="ticket-subtotal">₡0,00</span>
+            </div>
+            <div class="ticket-fila">
+                <span class="gris">Impuestos</span>
+                <span id="ticket-impuestos">₡0,00</span>
+            </div>
+            <div class="ticket-total">
+                <span>Total</span>
+                <span id="ticket-total">₡0,00</span>
+            </div>
+
+            <button type="button" id="registrar-comanda" class="btn-registrar" disabled>
+                Registrar comanda
+            </button>
         </div>
     </aside>
 
 </div>
 
-{{-- =========================================
-     MODAL: MENÚ DE PRODUCTOS
-========================================== --}}
-<div id="comanda-overlay"
-    class="comanda-overlay"
-    aria-hidden="true">
-
-    <div class="comanda-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Menú de productos">
-
-        <div id="contenido-menu" class="p-6 text-center text-gray-500">
+{{-- MODAL: MENÚ DE PRODUCTOS --}}
+<div id="comanda-overlay" class="comanda-overlay" aria-hidden="true">
+    <div class="comanda-modal" role="dialog" aria-modal="true" aria-label="Menú de productos">
+        <div id="contenido-menu" style="padding:24px;text-align:center;color:#6b7280;">
             Selecciona una mesa para cargar el menú.
         </div>
-
     </div>
 </div>
 
@@ -200,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let mesaActual = null;
     let pedido = {};
 
-    // Token único por cada intento de comanda
     function generarTokenIdempotencia() {
         return 'token-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
     }
@@ -234,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.classList.toggle('seleccionada', card === mesa);
             });
 
-            mesaLabel.textContent = 'Mesa ' + mesaActual.numero;
+            mesaLabel.textContent = mesaActual.numero;
             abrirModal();
 
             contenidoMenu.textContent = 'Cargando menú...';
@@ -257,8 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 contenidoMenu.innerHTML = await respuesta.text();
 
             } catch (error) {
-                contenidoMenu.textContent =
-                    'No se pudo cargar el menú. Inténtalo nuevamente.';
+                contenidoMenu.textContent = 'No se pudo cargar el menú. Inténtalo nuevamente.';
                 console.error(error);
             }
 
@@ -301,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nombre: nombre,
                 precio: precio,
                 cantidad: 0,
-                notas: '' // Notas y modificadores libres para mongoDB
+                notas: ''
             };
         }
 
@@ -319,32 +231,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (productos.length === 0) {
             const vacio = document.createElement('p');
-            vacio.className = 'text-center text-gray-500 py-8';
-            vacio.innerHTML = '<i class="ti ti-shopping-cart text-4xl block mb-2"></i>Agrega productos a la comanda.';
+            vacio.style.cssText = 'text-align:center;color:#6b7280;padding:32px 0;';
+            vacio.innerHTML = '<i class="ti ti-shopping-cart" style="font-size:36px;display:block;margin-bottom:8px;"></i>Agrega productos a la comanda.';
             ticket.appendChild(vacio);
 
             btnRegistrar.disabled = true;
-            btnRegistrar.className = 'w-full mt-6 rounded-lg bg-gray-300 text-gray-600 py-3 font-semibold cursor-not-allowed';
+            btnRegistrar.className = 'btn-registrar';
         } else {
             btnRegistrar.disabled = false;
-            btnRegistrar.className = 'w-full mt-6 rounded-lg bg-green-600 hover:bg-green-700 text-white py-3 font-semibold transition';
+            btnRegistrar.className = 'btn-registrar activo';
         }
 
-        productos.forEach((producto, index) => {
+        productos.forEach(producto => {
             subtotal += producto.precio * producto.cantidad;
 
             const fila = document.createElement('div');
-            fila.className = 'ticket-item mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200';
+            fila.className = 'ticket-item';
 
             const encabezado = document.createElement('div');
-            encabezado.className = 'flex justify-between gap-2';
+            encabezado.style.cssText = 'display:flex;justify-content:space-between;gap:8px;';
 
             const nombre = document.createElement('span');
-            nombre.className = 'font-medium text-sm text-gray-800';
+            nombre.style.cssText = 'font-weight:500;font-size:14px;';
             nombre.textContent = producto.nombre;
 
             const importe = document.createElement('span');
-            importe.className = 'font-semibold text-sm text-gray-900 whitespace-nowrap';
+            importe.style.cssText = 'font-weight:600;font-size:14px;white-space:nowrap;';
             importe.textContent = formatoCRC(producto.precio * producto.cantidad);
 
             encabezado.append(nombre, importe);
@@ -352,18 +264,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const inputNota = document.createElement('input');
             inputNota.type = 'text';
             inputNota.placeholder = 'Notas libres (ej. sin cebolla, término medio)';
-            inputNota.className = 'w-full mt-2 text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-gray-900';
+            inputNota.style.cssText = 'width:100%;margin-top:8px;font-size:12px;padding:6px;border:1px solid #d1d5db;border-radius:6px;';
             inputNota.value = producto.notas || '';
-            inputNota.addEventListener('input', (e) => {
+            inputNota.addEventListener('input', e => {
                 producto.notas = e.target.value;
             });
 
             const controles = document.createElement('div');
-            controles.className = 'ticket-cantidad flex items-center justify-between mt-2 text-xs';
+            controles.className = 'ticket-cantidad';
+            controles.style.cssText = 'justify-content:space-between;margin-top:8px;font-size:12px;';
 
             const menos = document.createElement('button');
             menos.type = 'button';
-            menos.className = 'px-2 py-1 bg-gray-200 rounded text-gray-700 font-bold';
             menos.textContent = '−';
             menos.addEventListener('click', () => {
                 producto.cantidad--;
@@ -374,12 +286,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const cantidad = document.createElement('span');
-            cantidad.className = 'font-semibold text-gray-700';
+            cantidad.style.fontWeight = '600';
             cantidad.textContent = 'Cantidad: ' + producto.cantidad;
 
             const mas = document.createElement('button');
             mas.type = 'button';
-            mas.className = 'px-2 py-1 bg-gray-200 rounded text-gray-700 font-bold';
             mas.textContent = '+';
             mas.addEventListener('click', () => {
                 producto.cantidad++;
@@ -399,9 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('ticket-total').textContent = formatoCRC(total);
     }
 
-    // =======================================================
     // ENVIAR COMANDA A LARAVEL (SQL SERVER + MONGODB)
-    // =======================================================
     btnRegistrar.addEventListener('click', async () => {
         if (!mesaActual || Object.keys(pedido).length === 0) {
             alert('Por favor selecciona una mesa y agrega productos a la comanda.');
@@ -411,7 +320,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btnRegistrar.disabled = true;
         btnRegistrar.textContent = 'Procesando y guardando...';
 
-        // Mapear los detalles para enviar a SQL Server y MongoDB
         const detalles = Object.values(pedido).map((p, idx) => ({
             num_linea: idx + 1,
             id_producto: p.id,
@@ -422,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = {
             token_idempotencia: generarTokenIdempotencia(),
             id_mesa: mesaActual.id,
-            id_empleado: 1, // ID del empleado actual
+            id_empleado: 1,
             observaciones: 'Comanda tomada desde interfaz de Mesero',
             detalles: detalles
         };
@@ -431,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const respuesta = await fetch("{{ route('mesero.guardar') }}", {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json', // <--- ¡AQUÍ ESTABA EL ERROR! Debe ser application/json
+                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': "{{ csrf_token() }}",
                     'Accept': 'application/json'
                 },
@@ -442,8 +350,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (respuesta.ok && resultado.success) {
                 alert('¡Comanda #' + resultado.id_pedido + ' registrada con éxito en SQL Server y MongoDB!');
-
-                // Limpiar ticket y refrescar la vista
                 pedido = {};
                 renderTicket();
                 window.location.reload();

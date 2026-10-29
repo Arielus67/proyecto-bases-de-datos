@@ -16,11 +16,10 @@ Route::resource('caja', ControllerCaja::class);
 Route::resource('productos', ControllerProductos::class);
 
 
-Route::get('/mesero', [ControllerMesa::class, 'index'])
-    ->name('mesero.index');
+Route::get('/mesero', [ControllerMesa::class, 'index'])->name('mesero.index');
 
-Route::get('/mesero/mesas/{id}/productos', [ControllerMesa::class, 'productosMesa'])
-    ->name('mesero.mesas.productos');
+Route::get('/mesero/mesas/{id}/productos', [ControllerMesa::class, 'productosMesa'])->name('mesero.mesas.productos');
 
 Route::post('/mesero/guardar-pedido', [ControllerMesa::class, 'store'])->name('mesero.guardar');
 Route::put('/cocina/actualizar-estado/{id}', [ControllerCocina::class, 'update'])->name('cocina.actualizar');
+
