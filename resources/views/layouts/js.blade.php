@@ -8,3 +8,13 @@
         $('.datatable').DataTable()
     });
 </script>
+
+<script>
+
+    document.addEventListener('submit', function (e) {
+        var mensaje = e.target.getAttribute('data-confirm');
+        if (mensaje && !confirm(mensaje)) {
+            e.preventDefault();
+        }
+    });
+</script>
