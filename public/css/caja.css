@@ -1,0 +1,597 @@
+/* ==============================
+   ANCHO COMPLETO (anula límites del tema)
+============================== */
+
+#main-wrapper {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.page-wrapper {
+    flex: 1 1 0% !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
+/* ==============================
+   LAYOUT
+============================== */
+
+.caja-layout {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start;
+    gap: 24px;
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.caja-lista {
+    flex: 1 1 0% !important;
+    min-width: 0;
+}
+
+.caja-titulo {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px;
+}
+
+.caja-subtitulo {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0 0 16px;
+}
+
+.caja-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)) !important;
+    gap: 16px;
+}
+
+/* ==============================
+   TARJETAS DE PEDIDO
+============================== */
+
+.pedido-card {
+    width: 100%;
+    padding: 20px;
+    text-align: left;
+    cursor: pointer;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
+    transition: background-color .2s ease, border-color .2s ease,
+                box-shadow .2s ease, transform .2s ease;
+}
+
+.pedido-card:hover {
+    background-color: #eff6ff;
+    border-color: #2563eb;
+    transform: translateY(-3px);
+}
+
+.pedido-card.seleccionado {
+    background-color: #c7defb;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.pedido-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.pedido-top i {
+    font-size: 28px;
+    color: #374151;
+}
+
+.pedido-estado {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #166534;
+}
+
+.pedido-mesa {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.pedido-info {
+    font-size: 13px;
+    color: #6b7280;
+    margin: 4px 0 0;
+}
+
+.pedido-total {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 12px 0 0;
+}
+
+.caja-vacio {
+    grid-column: 1 / -1;
+    padding: 48px 20px;
+    text-align: center;
+    background: #fff;
+    border: 1px dashed #d1d5db;
+    border-radius: 14px;
+    color: #6b7280;
+}
+
+.caja-vacio i {
+    display: block;
+    font-size: 48px;
+    color: #9ca3af;
+    margin-bottom: 12px;
+}
+
+.caja-vacio-titulo {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 4px;
+}
+
+/* ==============================
+   PANEL DE COBRO
+============================== */
+
+.cobro-panel {
+    width: 420px !important;
+    flex: 0 0 420px !important;
+    position: sticky;
+    top: 90px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
+}
+
+.cobro-header {
+    background: #0f172a;
+    padding: 20px;
+}
+
+.cobro-header * {
+    color: #fff !important;
+}
+
+.cobro-header-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cobro-header-top i {
+    font-size: 30px;
+}
+
+.cobro-header-top h2 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.cobro-header-pie {
+    border-top: 1px solid #475569;
+    margin-top: 16px;
+    padding-top: 12px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.cobro-body {
+    padding: 20px;
+}
+
+.cobro-vacio {
+    text-align: center;
+    color: #6b7280;
+    padding: 32px 0;
+}
+
+.cobro-vacio i {
+    display: block;
+    font-size: 40px;
+    margin-bottom: 8px;
+}
+
+.cobro-sub {
+    font-weight: 600;
+    margin: 0 0 10px;
+}
+
+.cobro-item {
+    padding: 8px 0;
+    border-bottom: 1px dashed #d1d5db;
+    font-size: 14px;
+}
+
+.cobro-item-fila {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.cobro-nota {
+    display: block;
+    color: #dc2626;
+    margin-top: 2px;
+}
+
+.cobro-label {
+    display: block;
+    font-size: 13px;
+    color: #6b7280;
+    margin: 14px 0 4px;
+}
+
+.cobro-input {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.cobro-alerta {
+    margin-top: 14px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #991b1b;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+}
+
+.cobro-fila {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.cobro-fila .gris {
+    color: #6b7280;
+}
+
+.cobro-total {
+    display: flex;
+    justify-content: space-between;
+    font-size: 18px;
+    font-weight: 700;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 12px;
+    padding-top: 12px;
+}
+
+.pago-fila {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 28px;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.pago-fila .pago-ref {
+    grid-column: 1 / 3;
+}
+
+.pago-quitar {
+    grid-row: 1;
+    grid-column: 3;
+    border: 0;
+    border-radius: 8px;
+    background: #f3f4f6;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.pago-quitar:hover {
+    background: #fecaca;
+}
+
+.btn-agregar-pago {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+    border: 1px dashed #9ca3af;
+    border-radius: 8px;
+    background: transparent;
+    color: #374151;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.btn-agregar-pago:hover {
+    background: #f3f4f6;
+}
+
+.btn-cobrar {
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px;
+    border: 0;
+    border-radius: 8px;
+    background: #16a34a;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color .2s ease;
+}
+
+.btn-cobrar:hover:not(:disabled) {
+    background: #15803d;
+}
+
+.btn-cobrar:disabled {
+    background: #d1d5db;
+    color: #4b5563;
+    cursor: not-allowed;
+}
+
+/* ==============================
+   TICKET DE FACTURA
+============================== */
+
+.ticket-acciones {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.btn-ticket,
+.btn-ticket-sec {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.btn-ticket {
+    border: 0;
+    background: #2563eb;
+    color: #fff;
+}
+
+.btn-ticket-sec {
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #111827;
+}
+
+.ticket-print {
+    width: 360px;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 24px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
+    font-size: 14px;
+}
+
+.ticket-print hr {
+    border: 0;
+    border-top: 1px dashed #9ca3af;
+    margin: 12px 0;
+}
+
+.ticket-centro {
+    text-align: center;
+}
+
+.ticket-centro h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 4px;
+}
+
+.ticket-centro p {
+    margin: 2px 0;
+    color: #4b5563;
+}
+
+.ticket-linea {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 4px 0;
+}
+
+.ticket-total-linea {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.ticket-nota {
+    display: block;
+    color: #6b7280;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    .ticket-print,
+    .ticket-print * {
+        visibility: visible;
+    }
+
+    .ticket-print {
+        position: absolute;
+        left: 0;
+        top: 0;
+        border: 0;
+        box-shadow: none;
+    }
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+
+@media (max-width: 1024px) {
+    .caja-layout {
+        flex-direction: column !important;
+    }
+
+    .cobro-panel {
+        width: 100% !important;
+        flex: 1 1 auto !important;
+        position: static;
+    }
+}
+
+/* ==============================
+   CIERRE DE TURNO
+============================== */
+
+.caja-barra {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+.btn-turno {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    background: #fff;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-turno:hover {
+    background: #f3f4f6;
+}
+
+.turno-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgb(0 0 0 / 60%);
+}
+
+.turno-overlay.activa {
+    display: flex;
+}
+
+.turno-modal {
+    width: 100%;
+    max-width: 460px;
+    max-height: 92vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
+}
+
+.turno-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    background: #0f172a;
+    border-radius: 16px 16px 0 0;
+}
+
+.turno-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.turno-x {
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.turno-body {
+    padding: 20px;
+}
+
+.turno-aviso {
+    text-align: center;
+    color: #6b7280;
+    padding: 24px 0;
+}
+
+.turno-detalle {
+    margin-top: 6px;
+    padding-bottom: 6px;
+    font-size: 14px;
+}
+
+.turno-sub {
+    padding-left: 10px;
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.turno-acciones {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.turno-acciones .btn-ticket-sec,
+.turno-acciones .btn-cerrar-turno {
+    flex: 1;
+    justify-content: center;
+}
+
+.btn-cerrar-turno {
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 10px;
+    background: #dc2626;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-cerrar-turno:hover:not(:disabled) {
+    background: #b91c1c;
+}
+
+.btn-cerrar-turno:disabled {
+    background: #d1d5db;
+    color: #4b5563;
+    cursor: not-allowed;
+}

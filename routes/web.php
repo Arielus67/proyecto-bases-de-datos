@@ -27,14 +27,11 @@ use App\Http\Controllers\PagoController;
 use App\Http\Controllers\TurnoCajaController;
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\AlertaStockController;
-
-
 /*
 |--------------------------------------------------------------------------
 | PANEL ADMINISTRATIVO
 |--------------------------------------------------------------------------
 */
-
 Route::prefix('admin')->name('admin.')->group(function () {
 
     // DASHBOARD
@@ -109,25 +106,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
         ->name('alertas.atender');
 
 });
-
-
 /*
 |--------------------------------------------------------------------------
 | REDIRECCIÓN PRINCIPAL
 |--------------------------------------------------------------------------
 */
-
 Route::get('/', function () {
     return redirect()->route('mesero.index');
 });
-
-
 /*
 |--------------------------------------------------------------------------
 | MÓDULO MESERO
 |--------------------------------------------------------------------------
 */
-
 Route::get('/mesero', [ControllerMesa::class, 'index'])
     ->name('mesero.index');
 
@@ -137,33 +128,31 @@ Route::get('/mesero/mesas/{id}/productos', [ControllerMesa::class, 'productosMes
 Route::post('/mesero/guardar-pedido', [ControllerMesa::class, 'store'])
     ->name('mesero.guardar');
 
-
+Route::patch('/mesero/pedidos/{id}/entregar', [ControllerMesa::class, 'entregar'])
+    ->name('mesero.entregar');
 /*
 |--------------------------------------------------------------------------
 | MÓDULO COCINA
 |--------------------------------------------------------------------------
 */
-
 Route::resource('cocina', ControllerCocina::class);
 
 Route::put('/cocina/actualizar-estado/{id}', [ControllerCocina::class, 'update'])
     ->name('cocina.actualizar');
-
-
 /*
 |--------------------------------------------------------------------------
 | MÓDULO CAJA
 |--------------------------------------------------------------------------
 */
-
-Route::resource('caja', ControllerCaja::class);
-
-
+Route::get('/caja', [ControllerCaja::class, 'index'])->name('caja.index');
+Route::post('/caja/cobrar/{id}', [ControllerCaja::class, 'cobrar'])->name('caja.cobrar');
+Route::get('/caja/ticket/{numero}', [ControllerCaja::class, 'ticket'])->name('caja.ticket');
+Route::get('/caja/turnos/{id}/resumen', [ControllerCaja::class, 'resumenTurno'])->name('caja.turno.resumen');
+Route::post('/caja/turnos/{id}/cerrar', [ControllerCaja::class, 'cerrarTurno'])->name('caja.turno.cerrar');
 /*
 |--------------------------------------------------------------------------
 | MÓDULO PRODUCTOS INDEPENDIENTE
 |--------------------------------------------------------------------------
 */
-
 Route::resource('productos', ControllerProductos::class);
 

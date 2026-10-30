@@ -8,144 +8,176 @@
 
 @section('contenido')
 
-{{-- ENCABEZADO DEL MÓDULO --}}
-<div class="kds-top">
-    <div class="kds-top-info">
-        <div class="kds-top-icono">
-            <i class="ti ti-tools-kitchen-2"></i>
+    {{-- ENCABEZADO DEL MÓDULO --}}
+    <div class="kds-top">
+        <div class="kds-top-info">
+            <div class="kds-top-icono">
+                <i class="ti ti-tools-kitchen-2"></i>
+            </div>
+            <div>
+                <h2 class="kds-titulo">Kitchen Display System (KDS)</h2>
+                <p class="kds-subtitulo">
+                    Gestión de comandas en tiempo real desde MongoDB ·
+                    se actualiza cada 15 s (última: <span id="kds-hora-act">{{ now()->format('H:i:s') }}</span>)
+                </p>
+            </div>
         </div>
-        <div>
-            <h2 class="kds-titulo">Kitchen Display System (KDS)</h2>
-            <p class="kds-subtitulo">Gestión de comandas en tiempo real desde MongoDB</p>
-        </div>
+
+        <button type="button" onclick="refrescar()" class="kds-btn-actualizar">
+            <i class="ti ti-rotate-clockwise"></i>
+            Actualizar Pantalla
+        </button>
     </div>
 
-    <button type="button" onclick="window.location.reload()" class="kds-btn-actualizar">
-        <i class="ti ti-rotate-clockwise"></i>
-        Actualizar Pantalla
-    </button>
-</div>
+    {{-- CUADRÍCULA DE COMANDAS --}}
+    <div class="kds-grid" id="kds-grid">
+        @forelse($comandas as $comanda)
+            @php
+                $esAbierto = $comanda->estado === 'ABIERTO';
+                $claseCard = $esAbierto ? 'estado-abierto' : 'estado-preparacion';
+                $claseBadge = $esAbierto ? 'badge-abierto' : 'badge-preparacion';
+            @endphp
 
-{{-- CUADRÍCULA DE COMANDAS --}}
-<div class="kds-grid">
-    @forelse($comandas as $comanda)
-        @php
-            $esAbierto = $comanda->estado === 'ABIERTO';
-            $claseCard = $esAbierto ? 'estado-abierto' : 'estado-preparacion';
-            $claseBadge = $esAbierto ? 'badge-abierto' : 'badge-preparacion';
-        @endphp
+            <div class="kds-card {{ $claseCard }}">
 
-        <div class="kds-card {{ $claseCard }}">
+                <div class="kds-card-header">
+                    <div class="kds-header-fila">
+                        <div class="kds-mesa-info">
+                            <i class="ti ti-armchair"></i>
+                            <div>
+                                <span class="kds-etiqueta">Mesa</span>
+                                <h3 class="kds-mesa-nombre">Mesa {{ $comanda->id_mesa }}</h3>
+                            </div>
+                        </div>
 
-            {{-- Cabecera --}}
-            <div class="kds-card-header">
-                <div class="kds-header-fila">
-                    <div class="kds-mesa-info">
-                        <i class="ti ti-armchair"></i>
-                        <div>
-                            <span class="kds-etiqueta">Mesa</span>
-                            <h3 class="kds-mesa-nombre">Mesa {{ $comanda->id_mesa }}</h3>
+                        <div class="kds-pedido">
+                            <span class="kds-etiqueta">Pedido SQL</span>
+                            <span class="kds-pedido-num">#{{ $comanda->id_pedido_sql }}</span>
                         </div>
                     </div>
 
-                    <div class="kds-pedido">
-                        <span class="kds-etiqueta">Pedido SQL</span>
-                        <span class="kds-pedido-num">#{{ $comanda->id_pedido_sql }}</span>
+                    <div class="kds-header-pie">
+                        <span class="kds-badge {{ $claseBadge }}">
+                            {{ str_replace('_', ' ', $comanda->estado) }}
+                        </span>
+                        <span class="kds-hora">
+                            <i class="ti ti-clock"></i> {{ $comanda->created_at->format('H:i:s') }}
+                        </span>
                     </div>
                 </div>
 
-                <div class="kds-header-pie">
-                    <span class="kds-badge {{ $claseBadge }}">
-                        {{ str_replace('_', ' ', $comanda->estado) }}
-                    </span>
-                    <span class="kds-hora">
-                        <i class="ti ti-clock"></i> {{ $comanda->created_at->format('H:i:s') }}
-                    </span>
+                <div class="kds-card-body">
+                    <h4 class="kds-body-titulo">Productos solicitados</h4>
+
+                    <ul class="kds-lista">
+                        @foreach ($comanda->detalles_con_modificadores as $detalle)
+                            <li class="kds-item">
+                                <div class="kds-item-fila">
+                                    <span>{{ $nombresProductos[$detalle['id_producto']] ?? 'Producto #' . $detalle['id_producto'] }}</span>
+                                    <span class="kds-cantidad">x{{ $detalle['cantidad'] }}</span>
+                                </div>
+
+                                @if (!empty($detalle['notas']))
+                                    <p class="kds-nota">
+                                        <i class="ti ti-alert-circle"></i> Nota: {{ $detalle['notas'] }}
+                                    </p>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
                 </div>
+
+                <div class="kds-card-footer">
+                    @if ($comanda->estado === 'ABIERTO')
+                        <button type="button" onclick="cambiarEstado(this, '{{ $comanda->_id }}', 'EN_PREPARACION')"
+                            class="kds-btn kds-btn-iniciar">
+                            <i class="ti ti-flame"></i>
+                            Iniciar Preparación
+                        </button>
+                    @elseif($comanda->estado === 'EN_PREPARACION')
+                        <button type="button" onclick="cambiarEstado(this, '{{ $comanda->_id }}', 'LISTO')"
+                            class="kds-btn kds-btn-listo">
+                            <i class="ti ti-check"></i>
+                            Marcar como Listo
+                        </button>
+                    @endif
+                </div>
+
             </div>
-
-            {{-- Cuerpo --}}
-            <div class="kds-card-body">
-                <h4 class="kds-body-titulo">Productos solicitados</h4>
-
-                <ul class="kds-lista">
-                    @foreach($comanda->detalles_con_modificadores as $detalle)
-                        <li class="kds-item">
-                            <div class="kds-item-fila">
-                                <span>{{ $nombresProductos[$detalle['id_producto']] ?? 'Producto #' . $detalle['id_producto'] }}</span>
-                                <span class="kds-cantidad">x{{ $detalle['cantidad'] }}</span>
-                            </div>
-
-                            @if(!empty($detalle['notas']))
-                                <p class="kds-nota">
-                                    <i class="ti ti-alert-circle"></i> Nota: {{ $detalle['notas'] }}
-                                </p>
-                            @endif
-                        </li>
-                    @endforeach
-                </ul>
+        @empty
+            <div class="kds-vacio">
+                <i class="ti ti-coffee"></i>
+                <p class="kds-vacio-titulo">No hay comandas pendientes</p>
+                <p class="kds-vacio-texto">Las nuevas comandas aparecerán aquí automáticamente.</p>
             </div>
-
-            {{-- Acción --}}
-            <div class="kds-card-footer">
-                @if($comanda->estado === 'ABIERTO')
-                    <button type="button"
-                        onclick="cambiarEstado(this, '{{ $comanda->_id }}', 'EN_PREPARACION')"
-                        class="kds-btn kds-btn-iniciar">
-                        <i class="ti ti-flame"></i>
-                        Iniciar Preparación
-                    </button>
-                @elseif($comanda->estado === 'EN_PREPARACION')
-                    <button type="button"
-                        onclick="cambiarEstado(this, '{{ $comanda->_id }}', 'LISTO')"
-                        class="kds-btn kds-btn-listo">
-                        <i class="ti ti-check"></i>
-                        Marcar como Listo
-                    </button>
-                @endif
-            </div>
-
-        </div>
-    @empty
-        <div class="kds-vacio">
-            <i class="ti ti-coffee"></i>
-            <p class="kds-vacio-titulo">No hay comandas pendientes</p>
-            <p class="kds-vacio-texto">Las nuevas comandas aparecerán aquí automáticamente en tiempo real.</p>
-        </div>
-    @endforelse
-</div>
+        @endforelse
+    </div>
 
 @endsection
 
 @push('scripts')
-<script>
-    async function cambiarEstado(boton, idComanda, nuevoEstado) {
-        boton.disabled = true;
+    <script>
+        let refrescando = false;
 
-        try {
-            const respuesta = await fetch(`/cocina/actualizar-estado/${idComanda}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': "{{ csrf_token() }}",
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ estado: nuevoEstado })
-            });
+        // Pide la página de nuevo y reemplaza solo la cuadrícula (sin parpadeo ni recargar)
+        async function refrescar() {
+            if (refrescando || document.querySelector('.kds-btn:disabled')) return;
+            refrescando = true;
 
-            const resultado = await respuesta.json();
+            try {
+                const respuesta = await fetch(window.location.href, {
+                    cache: 'no-store',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                if (!respuesta.ok) throw new Error('HTTP ' + respuesta.status);
 
-            if (respuesta.ok && resultado.success) {
-                window.location.reload();
-            } else {
-                alert('Error al actualizar el estado: ' + (resultado.message || 'Error desconocido'));
-                boton.disabled = false;
+                const doc = new DOMParser().parseFromString(await respuesta.text(), 'text/html');
+                const nuevo = doc.getElementById('kds-grid');
+
+                if (nuevo) {
+                    document.getElementById('kds-grid').innerHTML = nuevo.innerHTML;
+                    document.getElementById('kds-hora-act').textContent = new Date().toLocaleTimeString('es-CR');
+                }
+            } catch (error) {
+                console.error('No se pudo refrescar:', error);
+            } finally {
+                refrescando = false;
             }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Ocurrió un error de red al comunicarse con el servidor.');
-            boton.disabled = false;
         }
-    }
-</script>
+
+        setInterval(refrescar, 15000);
+
+        async function cambiarEstado(boton, idComanda, nuevoEstado) {
+            boton.disabled = true;
+
+            try {
+                const respuesta = await fetch(`/cocina/actualizar-estado/${idComanda}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': "{{ csrf_token() }}",
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        estado: nuevoEstado
+                    })
+                });
+
+                const resultado = await respuesta.json();
+
+                if (!(respuesta.ok && resultado.success)) {
+                    alert('Error al actualizar el estado: ' + (resultado.message || 'Error desconocido'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ocurrió un error de red al comunicarse con el servidor.');
+            }
+
+            // Éxito o error: volver a leer el estado real
+            boton.disabled = false;
+            await refrescar();
+        }
+    </script>
 @endpush

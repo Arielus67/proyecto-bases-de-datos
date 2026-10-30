@@ -12,11 +12,5 @@
         <a href="{{ url('/productos') }}" class="flex items-center gap-3 py-2 text-white hover:text-blue-300">
             <i class="ti ti-soup"></i> Productos
         </a>
-        <a href="{{ url('/cocina') }}" class="flex items-center gap-3 py-2 text-white hover:text-blue-300">
-            <i class="ti ti-chef-hat"></i> Cocina
-        </a>
-        <a href="{{ url('/caja') }}" class="flex items-center gap-3 py-2 text-white hover:text-blue-300">
-            <i class="ti ti-cash"></i> Caja
-        </a>
     </nav>
 </aside>

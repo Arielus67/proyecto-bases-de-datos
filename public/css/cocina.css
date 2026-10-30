@@ -380,3 +380,9 @@
         grid-template-columns: 1fr !important;
     }
 }
+
+/* Indicador de última actualización */
+#kds-hora-act {
+    font-weight: 600;
+    color: #374151;
+}
