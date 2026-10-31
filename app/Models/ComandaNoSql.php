@@ -15,7 +15,13 @@ class ComandaNoSql extends Model
         'id_mesa',
         'id_empleado',
         'estado',
-        'detalles_con_modificadores', // Modificadores libres, notas y alérgenos
-        'tiempos_cocina'
+        'detalles_con_modificadores', // Modificadores libres, notas y alérgenos (cada línea lleva su "ronda")
+        'tiempos_cocina',
+        'ronda_actual', // Número de la ronda que cocina debe preparar ahora
+        'ronda_at',     // Hora en que se envió la ronda actual
+    ];
+
+    protected $casts = [
+        'ronda_at' => 'datetime',
     ];
 }

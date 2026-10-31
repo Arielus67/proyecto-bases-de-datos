@@ -9,8 +9,5 @@
         <a href="{{ url('/mesero') }}" class="flex items-center gap-3 py-2 text-white hover:text-blue-300">
             <i class="ti ti-receipt-2"></i> Gestión de comandas
         </a>
-        <a href="{{ url('/productos') }}" class="flex items-center gap-3 py-2 text-white hover:text-blue-300">
-            <i class="ti ti-soup"></i> Productos
-        </a>
     </nav>
 </aside>

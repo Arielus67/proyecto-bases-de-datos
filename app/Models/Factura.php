@@ -48,6 +48,15 @@ class Factura extends Model
             'id_turno'
         );
     }
+    public function anuladaPor(): BelongsTo
+    {
+        return $this->belongsTo(
+            Empleado::class,
+            'anulada_por',
+            'id_empleado'
+        );
+    }
+
     public function cajero()
 {
     return $this->hasOneThrough(

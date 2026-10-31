@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ControllerMesa;
 use App\Http\Controllers\ControllerCocina;
 use App\Http\Controllers\ControllerCaja;
-use App\Http\Controllers\ControllerProductos;
 
 // CONTROLADORES ADMINISTRATIVOS
 use App\Http\Controllers\DashboardController;
@@ -128,6 +127,9 @@ Route::get('/mesero/mesas/{id}/productos', [ControllerMesa::class, 'productosMes
 Route::post('/mesero/guardar-pedido', [ControllerMesa::class, 'store'])
     ->name('mesero.guardar');
 
+Route::post('/mesero/pedidos/{id}/agregar', [ControllerMesa::class, 'agregar'])
+    ->name('mesero.agregar');
+
 Route::patch('/mesero/pedidos/{id}/entregar', [ControllerMesa::class, 'entregar'])
     ->name('mesero.entregar');
 /*
@@ -135,7 +137,8 @@ Route::patch('/mesero/pedidos/{id}/entregar', [ControllerMesa::class, 'entregar'
 | MÓDULO COCINA
 |--------------------------------------------------------------------------
 */
-Route::resource('cocina', ControllerCocina::class);
+Route::get('/cocina', [ControllerCocina::class, 'index'])
+    ->name('cocina.index');
 
 Route::put('/cocina/actualizar-estado/{id}', [ControllerCocina::class, 'update'])
     ->name('cocina.actualizar');
@@ -149,10 +152,3 @@ Route::post('/caja/cobrar/{id}', [ControllerCaja::class, 'cobrar'])->name('caja.
 Route::get('/caja/ticket/{numero}', [ControllerCaja::class, 'ticket'])->name('caja.ticket');
 Route::get('/caja/turnos/{id}/resumen', [ControllerCaja::class, 'resumenTurno'])->name('caja.turno.resumen');
 Route::post('/caja/turnos/{id}/cerrar', [ControllerCaja::class, 'cerrarTurno'])->name('caja.turno.cerrar');
-/*
-|--------------------------------------------------------------------------
-| MÓDULO PRODUCTOS INDEPENDIENTE
-|--------------------------------------------------------------------------
-*/
-Route::resource('productos', ControllerProductos::class);
-

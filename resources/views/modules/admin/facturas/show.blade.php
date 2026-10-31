@@ -47,12 +47,24 @@
         @endforelse
     </x-admin.table>
 
+    {{-- ========== DATOS DE ANULACIÓN (si aplica) ========== --}}
+    @if ($item->estado === 'ANULADA')
+        <div class="mt-6 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+            Anulada por {{ $item->anuladaPor->nombre ?? '—' }} {{ $item->anuladaPor->apellido ?? '' }}
+            @if ($item->fecha_anulacion) el {{ \Carbon\Carbon::parse($item->fecha_anulacion)->format('d/m/Y H:i') }} @endif
+            — Motivo: {{ $item->motivo_anulacion ?? '—' }}
+        </div>
+    @endif
+
     {{-- ========== ANULAR FACTURA ========== --}}
     @if ($item->estado === 'COBRADA')
-        <form method="POST" action="{{ route('admin.facturas.anular', $item->id_factura) }}" data-confirm="¿Anular esta factura?" class="mt-6">
+        <form method="POST" action="{{ route('admin.facturas.anular', $item->id_factura) }}" data-confirm="¿Anular esta factura?"
+              class="bg-white border border-red-200 rounded-lg p-6 mt-6">
             @csrf
             @method('PATCH')
-            <button class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90">Anular factura</button>
+            <h3 class="text-lg font-semibold text-red-700 mb-3">Anular factura</h3>
+            <x-admin.input name="motivo_anulacion" label="Motivo de anulación" required maxlength="255" />
+            <button class="mt-4 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90">Anular factura</button>
         </form>
     @endif
 @endsection

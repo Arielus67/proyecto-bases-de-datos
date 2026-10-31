@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BitacoraEventoNoSql;
+use App\Models\ComandaNoSql;
 use App\Models\Pedido;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PedidoController extends Controller
 {
@@ -40,12 +44,31 @@ class PedidoController extends Controller
             'motivo_anulacion' => ['required', 'string', 'max:255'],
         ]);
 
-        // auth()->id() debe ser el id_empleado de quien anula (columna anulado_por, FK a EMPLEADO)
-        $pedido->forceFill([
-            'estado'           => 'ANULADO',
-            'anulado_por'      => auth()->id(),
-            'motivo_anulacion' => $datos['motivo_anulacion'],
-        ])->save();
+        try {
+            // sp_anular_pedido: devuelve insumos pendientes, cancela las líneas, marca el pedido y libera la mesa
+            // auth()->id() debe ser el id_empleado de quien anula (columna anulado_por, FK a EMPLEADO)
+            DB::connection('sqlsrv')->statement(
+                'EXEC sp_anular_pedido @id_pedido = ?, @id_empleado = ?, @motivo = ?',
+                [$pedido->id_pedido, auth()->id(), $datos['motivo_anulacion']]
+            );
+        } catch (\Throwable $e) {
+            Log::error('Error al anular pedido', ['pedido' => $pedido->id_pedido, 'error' => $e->getMessage()]);
+
+            return back()->with('error', 'No se pudo anular el pedido: ' . $this->mensajeSql($e));
+        }
+
+        // SQL ya quedó confirmado; la comanda deja de aparecer en cocina
+        try {
+            ComandaNoSql::where('id_pedido_sql', (int) $pedido->id_pedido)->update(['estado' => 'ANULADO']);
+
+            BitacoraEventoNoSql::create([
+                'evento'     => 'PEDIDO_ANULADO',
+                'detalles'   => 'Pedido #' . $pedido->id_pedido . ' anulado. Motivo: ' . $datos['motivo_anulacion'],
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Pedido anulado en SQL, pero falló MongoDB', ['pedido' => $pedido->id_pedido, 'error' => $e->getMessage()]);
+        }
 
         return redirect()->route('admin.pedidos.show', $pedido->id_pedido)->with('success', 'Pedido anulado correctamente.');
     }

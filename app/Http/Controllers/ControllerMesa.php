@@ -12,11 +12,19 @@ use Illuminate\Support\Facades\Log;
 
 class ControllerMesa extends Controller
 {
+    /** Estados de pedido que siguen abiertos (la mesa puede pedir más productos). */
+    private const ESTADOS_ABIERTOS = ['ABIERTO', 'EN_PREPARACION', 'LISTO', 'ENTREGADO'];
+
     public function index()
     {
         $mesas = Mesa::orderBy('numero_mesa')->get();
 
         $sql = DB::connection('sqlsrv');
+
+        // Pedido abierto de cada mesa: [id_mesa => id_pedido] (para agregarle más productos)
+        $pedidosActivos = $sql->table('PEDIDO')
+            ->whereIn('estado', self::ESTADOS_ABIERTOS)
+            ->pluck('id_pedido', 'id_mesa');
 
         // Pedidos que cocina ya dejó listos y esperan que el mesero los lleve
         $listos = $sql->table('PEDIDO as p')
@@ -29,12 +37,13 @@ class ControllerMesa extends Controller
         $detallesListos = $listos->isEmpty() ? collect() : $sql->table('DETALLE_PEDIDO as d')
             ->join('PRODUCTO as pr', 'pr.id_producto', '=', 'd.id_producto')
             ->whereIn('d.id_pedido', $listos->pluck('id_pedido'))
+            ->where('d.estado_cocina', 'LISTO')
             ->orderBy('d.id_pedido')->orderBy('d.num_linea')
             ->select('d.id_pedido', 'pr.nombre_producto', 'd.cantidad')
             ->get()
             ->groupBy('id_pedido');
 
-        return view('modules.mesero.index', compact('mesas', 'listos', 'detallesListos'));
+        return view('modules.mesero.index', compact('mesas', 'pedidosActivos', 'listos', 'detallesListos'));
     }
 
     public function productosMesa($id)
@@ -104,37 +113,6 @@ class ControllerMesa extends Controller
                 $nuevoIdPedido = $pedidoSql->id_pedido;
             }
 
-            $comandaExistente = ComandaNoSql::where('id_pedido_sql', (int) $nuevoIdPedido)->first();
-
-            if (!$comandaExistente) {
-                ComandaNoSql::create([
-                    'id_pedido_sql' => (int) $nuevoIdPedido,
-                    'token_idempotencia' => $datos['token_idempotencia'],
-                    'id_mesa' => (int) $datos['id_mesa'],
-                    'id_empleado' => (int) $datos['id_empleado'],
-                    'estado' => 'ABIERTO',
-                    'detalles_con_modificadores' => $datos['detalles'],
-                    'tiempos_cocina' => [
-                        'enviado_at' => now(),
-                        'preparando_at' => null,
-                        'listo_at' => null,
-                    ],
-                ]);
-
-                BitacoraEventoNoSql::create([
-                    'evento' => 'PEDIDO_CREADO',
-                    'detalles' => 'Pedido #' . $nuevoIdPedido .
-                        ' creado desde la mesa ' . $datos['id_mesa'],
-                    'created_at' => now(),
-                ]);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => '¡Pedido registrado con éxito!',
-                'id_pedido' => $nuevoIdPedido,
-            ]);
-
         } catch (\Throwable $ex) {
 
             Log::error('Error al registrar pedido', ['error' => $ex->getMessage()]);
@@ -144,6 +122,65 @@ class ControllerMesa extends Controller
                 'error' => $this->mensajeSql($ex),
             ], 422);
         }
+
+        // El pedido ya quedó en SQL Server. Si MongoDB falla no se devuelve error al mesero:
+        // cocina recupera la comanda desde SQL Server (ControllerCocina::recuperarComandasPerdidas).
+        try {
+            $this->guardarComanda((int) $nuevoIdPedido, $datos);
+        } catch (\Throwable $ex) {
+            Log::warning('Pedido OK en SQL, pero falló MongoDB', [
+                'pedido' => $nuevoIdPedido,
+                'error' => $ex->getMessage(),
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => '¡Pedido registrado con éxito!',
+            'id_pedido' => $nuevoIdPedido,
+        ]);
+    }
+
+    /**
+     * Agregar productos a un pedido que sigue abierto (nueva ronda en la misma mesa).
+     */
+    public function agregar(Request $request, string $id)
+    {
+        $datos = $request->validate([
+            'detalles' => ['required', 'array', 'min:1'],
+            'detalles.*.id_producto' => ['required', 'integer'],
+            'detalles.*.cantidad' => ['required', 'integer', 'min:1'],
+            'detalles.*.notas' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        $idPedido = (int) $id;
+
+        $lineas = collect($datos['detalles'])->map(fn ($d) => [
+            'id_producto' => (int) $d['id_producto'],
+            'cantidad'    => (int) $d['cantidad'],
+            'notas'       => $d['notas'] ?? '',
+        ])->values()->all();
+
+        try {
+            // sp_agregar_items_pedido: nuevas líneas, inventario, subtotal y pedido otra vez ABIERTO
+            DB::connection('sqlsrv')->statement(
+                'EXEC sp_agregar_items_pedido @id_pedido = ?, @json_lineas = ?',
+                [$idPedido, json_encode($lineas, JSON_THROW_ON_ERROR)]
+            );
+        } catch (\Throwable $ex) {
+            Log::error('Error al agregar productos al pedido', ['pedido' => $idPedido, 'error' => $ex->getMessage()]);
+
+            return response()->json(['success' => false, 'error' => $this->mensajeSql($ex)], 422);
+        }
+
+        // SQL ya quedó confirmado; si MongoDB falla, cocina lo recupera desde SQL Server
+        try {
+            $this->ampliarComanda($idPedido, $lineas);
+        } catch (\Throwable $ex) {
+            Log::warning('Productos agregados en SQL, pero falló MongoDB', ['pedido' => $idPedido, 'error' => $ex->getMessage()]);
+        }
+
+        return response()->json(['success' => true, 'id_pedido' => $idPedido]);
     }
 
     /**
@@ -205,13 +242,71 @@ class ControllerMesa extends Controller
         return response()->json(['success' => true]);
     }
 
-    /** Extrae solo el mensaje de SQL Server (sin la consulta ni datos de conexión). */
-    private function mensajeSql(\Throwable $e): string
+    /** Crea la comanda en MongoDB (si el pedido ya tenía comanda, no la duplica). */
+    private function guardarComanda(int $idPedido, array $datos): void
     {
-        if (preg_match('/\[SQL Server\](.*?)\s*\(Connection:/s', $e->getMessage(), $m)) {
-            return trim($m[1]);
+        if (ComandaNoSql::where('id_pedido_sql', $idPedido)->exists()) {
+            return;
         }
 
-        return $e->getMessage();
+        ComandaNoSql::create([
+            'id_pedido_sql' => $idPedido,
+            'token_idempotencia' => $datos['token_idempotencia'],
+            'id_mesa' => (int) $datos['id_mesa'],
+            'id_empleado' => (int) $datos['id_empleado'],
+            'estado' => 'ABIERTO',
+            'detalles_con_modificadores' => collect($datos['detalles'])
+                ->map(fn ($d) => $d + ['ronda' => 1])
+                ->all(),
+            'tiempos_cocina' => [
+                'enviado_at' => now(),
+                'preparando_at' => null,
+                'listo_at' => null,
+            ],
+            'ronda_actual' => 1,
+            'ronda_at' => now(),
+        ]);
+
+        BitacoraEventoNoSql::create([
+            'evento' => 'PEDIDO_CREADO',
+            'detalles' => 'Pedido #' . $idPedido . ' creado desde la mesa ' . $datos['id_mesa'],
+            'created_at' => now(),
+        ]);
+    }
+
+    /** Suma una nueva ronda a la comanda: vuelve a ABIERTO y cocina solo ve las líneas nuevas. */
+    private function ampliarComanda(int $idPedido, array $lineas): void
+    {
+        $comanda = ComandaNoSql::where('id_pedido_sql', $idPedido)->first();
+
+        // Sin comanda en MongoDB: cocina la reconstruye desde SQL Server
+        if (!$comanda) {
+            return;
+        }
+
+        $ronda = ((int) ($comanda->ronda_actual ?? 1)) + 1;
+
+        $nuevas = collect($lineas)->map(fn ($l) => $l + ['ronda' => $ronda])->all();
+
+        $comanda->detalles_con_modificadores = collect($comanda->detalles_con_modificadores ?? [])
+            ->merge($nuevas)
+            ->values()
+            ->all();
+
+        $comanda->estado = 'ABIERTO';
+        $comanda->ronda_actual = $ronda;
+        $comanda->ronda_at = now();
+        $comanda->tiempos_cocina = [
+            'enviado_at' => now(),
+            'preparando_at' => null,
+            'listo_at' => null,
+        ];
+        $comanda->save();
+
+        BitacoraEventoNoSql::create([
+            'evento' => 'PEDIDO_AMPLIADO',
+            'detalles' => 'Pedido #' . $idPedido . ': ronda ' . $ronda . ' enviada a cocina',
+            'created_at' => now(),
+        ]);
     }
 }

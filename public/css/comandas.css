@@ -478,3 +478,14 @@
     opacity: .6;
     cursor: not-allowed;
 }
+
+/* ==============================
+   MESA OCUPADA CON PEDIDO ABIERTO
+============================== */
+
+.mesa-agregar {
+    margin: 10px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2563eb;
+}

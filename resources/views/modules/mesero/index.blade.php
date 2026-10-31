@@ -42,15 +42,22 @@
             @endif
 
             <h2 class="mesas-titulo">Mesas del restaurante</h2>
-            <p class="mesas-subtitulo">Selecciona una mesa disponible para agregar productos.</p>
+            <p class="mesas-subtitulo">Selecciona una mesa disponible para abrir un pedido, o una ocupada para agregarle productos.</p>
 
             <div class="mesas-grid">
                 @forelse ($mesas as $mesa)
-                    @php $disponible = strtoupper($mesa->estado ?? '') === 'DISPONIBLE'; @endphp
+                    @php
+                        $disponible = strtoupper($mesa->estado ?? '') === 'DISPONIBLE';
+                        // Pedido abierto de una mesa ocupada: permite agregarle más productos
+                        $idPedidoAbierto = $disponible ? null : ($pedidosActivos[$mesa->id_mesa] ?? null);
+                        $bloqueada = !$disponible && !$idPedidoAbierto;
+                    @endphp
 
-                    <button type="button" class="mesa-card {{ $disponible ? '' : 'mesa-bloqueada' }}"
+                    <button type="button" class="mesa-card {{ $bloqueada ? 'mesa-bloqueada' : '' }}"
                         data-mesa-id="{{ $mesa->id_mesa }}" data-mesa-numero="{{ $mesa->numero_mesa }}"
-                        @disabled(!$disponible) title="{{ $disponible ? '' : 'Mesa no disponible' }}"
+                        data-pedido-id="{{ $idPedidoAbierto }}"
+                        @disabled($bloqueada)
+                        title="{{ $bloqueada ? 'Mesa no disponible' : ($idPedidoAbierto ? 'Agregar productos al pedido #' . $idPedidoAbierto : '') }}"
                         aria-label="Seleccionar mesa {{ $mesa->numero_mesa }}">
 
                         <div class="mesa-top">
@@ -64,6 +71,9 @@
                             <i class="ti ti-users"></i>
                             {{ $mesa->capacidad }} {{ $mesa->capacidad == 1 ? 'persona' : 'personas' }}
                         </p>
+                        @if ($idPedidoAbierto)
+                            <p class="mesa-agregar"><i class="ti ti-plus"></i> Agregar al pedido #{{ $idPedidoAbierto }}</p>
+                        @endif
                     </button>
                 @empty
                     <div style="border:1px solid #e5e7eb;border-radius:12px;padding:32px;text-align:center;">
@@ -142,11 +152,17 @@
             const btnRegistrar = document.getElementById('registrar-comanda');
 
             let mesaActual = null;
+            let tokenPedido = null;
             let pedido = {};
 
             function generarTokenIdempotencia() {
                 return 'token-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
             }
+
+            // Texto del botón principal: abrir un pedido nuevo o agregar a uno existente
+            const textoBoton = () => mesaActual && mesaActual.pedido
+                ? 'Agregar al pedido #' + mesaActual.pedido
+                : 'Registrar comanda';
 
             const formatoCRC = valor =>
                 '₡' + Number(valor).toLocaleString('es-CR', {
@@ -168,16 +184,24 @@
                 const mesa = event.target.closest('.mesa-card');
 
                 if (mesa && !mesa.disabled) {
+                    // Token nuevo solo al cambiar de mesa: si el envío se repite, el servidor no duplica el pedido
+                    if (!mesaActual || mesaActual.id !== mesa.dataset.mesaId) {
+                        tokenPedido = generarTokenIdempotencia();
+                    }
+
                     mesaActual = {
                         id: mesa.dataset.mesaId,
-                        numero: mesa.dataset.mesaNumero
+                        numero: mesa.dataset.mesaNumero,
+                        pedido: mesa.dataset.pedidoId || null
                     };
 
                     document.querySelectorAll('.mesa-card').forEach(card => {
                         card.classList.toggle('seleccionada', card === mesa);
                     });
 
-                    mesaLabel.textContent = mesaActual.numero;
+                    mesaLabel.textContent = mesaActual.numero +
+                        (mesaActual.pedido ? ' (agregar al pedido #' + mesaActual.pedido + ')' : '');
+                    btnRegistrar.textContent = textoBoton();
                     abrirModal();
 
                     contenidoMenu.textContent = 'Cargando menú...';
@@ -360,8 +384,17 @@
                     notas: p.notas || ''
                 }));
 
-                const payload = {
-                    token_idempotencia: generarTokenIdempotencia(),
+                // Mesa ocupada: se agregan productos al pedido abierto. Mesa libre: pedido nuevo.
+                const agregando = Boolean(mesaActual.pedido);
+
+                const url = agregando ?
+                    @json(url('/mesero/pedidos')) + '/' + mesaActual.pedido + '/agregar' :
+                    "{{ route('mesero.guardar') }}";
+
+                const payload = agregando ? {
+                    detalles: detalles
+                } : {
+                    token_idempotencia: tokenPedido,
                     id_mesa: mesaActual.id,
                     id_empleado: 1,
                     observaciones: 'Comanda tomada desde interfaz de Mesero',
@@ -369,7 +402,7 @@
                 };
 
                 try {
-                    const respuesta = await fetch("{{ route('mesero.guardar') }}", {
+                    const respuesta = await fetch(url, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -382,7 +415,9 @@
                     const resultado = await respuesta.json();
 
                     if (respuesta.ok && resultado.success) {
-                        alert('¡Comanda #' + resultado.id_pedido + ' registrada con éxito!');
+                        alert(agregando ?
+                            'Productos agregados al pedido #' + resultado.id_pedido :
+                            '¡Comanda #' + resultado.id_pedido + ' registrada con éxito!');
                         pedido = {};
                         renderTicket();
                         window.location.reload();
@@ -390,13 +425,13 @@
                         alert('Error al registrar la comanda: ' + (resultado.error || resultado
                             .message));
                         btnRegistrar.disabled = false;
-                        btnRegistrar.textContent = 'Registrar comanda';
+                        btnRegistrar.textContent = textoBoton();
                     }
                 } catch (error) {
                     console.error('Error:', error);
                     alert('Ocurrió un error de red al comunicarse con el servidor.');
                     btnRegistrar.disabled = false;
-                    btnRegistrar.textContent = 'Registrar comanda';
+                    btnRegistrar.textContent = textoBoton();
                 }
             });
 

@@ -1,6 +1,8 @@
 -- ============================================================================
 -- PROYECTO FINAL: SISTEMA DE RESTAURANTE (IF0010 BASES DE DATOS II)
 -- SCRIPT DDL, DML Y PROGRAMACIÓN T-SQL PARA MICROSOFT SQL SERVER
+-- VERSIÓN COMPLETA (incluye las correcciones de la sección 1)
+-- Para crear la base de datos desde cero.
 -- ============================================================================
 
 CREATE DATABASE RestauranteDB;
@@ -166,7 +168,7 @@ CREATE TABLE TURNO_CAJA (
     CONSTRAINT FK_TURNO_CAJERO FOREIGN KEY (id_empleado) REFERENCES EMPLEADO(id_empleado)
 );
 
--- 16. FACTURA
+-- 16. FACTURA (incluye los datos de anulación: motivo, quién y cuándo)
 CREATE TABLE FACTURA (
     id_factura INT IDENTITY(1,1) PRIMARY KEY,
     numero_factura VARCHAR(50) NOT NULL UNIQUE,
@@ -182,10 +184,14 @@ CREATE TABLE FACTURA (
     total DECIMAL(10,2) NOT NULL CHECK (total >= 0),
     vuelto DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (vuelto >= 0),
     estado VARCHAR(20) NOT NULL DEFAULT 'COBRADA' CHECK (estado IN ('COBRADA', 'ANULADA')),
+    motivo_anulacion VARCHAR(255) NULL,
+    anulada_por INT NULL,
+    fecha_anulacion DATETIME NULL,
     CONSTRAINT FK_FACTURA_PEDIDO FOREIGN KEY (id_pedido) REFERENCES PEDIDO(id_pedido),
     CONSTRAINT FK_FACTURA_CLIENTE FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id_cliente),
     CONSTRAINT FK_FACTURA_CAJERO FOREIGN KEY (id_empleado) REFERENCES EMPLEADO(id_empleado),
-    CONSTRAINT FK_FACTURA_TURNO FOREIGN KEY (id_turno) REFERENCES TURNO_CAJA(id_turno)
+    CONSTRAINT FK_FACTURA_TURNO FOREIGN KEY (id_turno) REFERENCES TURNO_CAJA(id_turno),
+    CONSTRAINT FK_FACTURA_ANULADA_POR FOREIGN KEY (anulada_por) REFERENCES EMPLEADO(id_empleado)
 );
 
 -- 17. METODO_PAGO
@@ -395,6 +401,7 @@ BEGIN
 END;
 GO
 
+-- Trigger AFTER UPDATE en PEDIDO (Libera la mesa cuando el pedido pasa a FACTURADO o ANULADO)
 CREATE TRIGGER trg_pedido_libera_mesa
 ON PEDIDO
 AFTER UPDATE
@@ -418,11 +425,13 @@ BEGIN
       );
 END;
 GO
+
 -- ============================================================================
 -- 5. PROCEDIMIENTOS ALMACENADOS COMPLEJOS Y NO BÁSICOS
 -- ============================================================================
 
 -- Procedimiento 1: Registrar Pedido Concurrente e Idempotente con JSON
+--   (inventario agrupado por insumo, valida stock antes de descontar y valida mesa disponible)
 CREATE OR ALTER PROCEDURE sp_registrar_pedido
     @token_idempotencia VARCHAR(100),
     @id_mesa INT,
@@ -456,7 +465,7 @@ BEGIN
         IF @estado_mesa IS NULL
             THROW 50001, 'La mesa especificada no existe.', 1;
 
-        -- NUEVO: la mesa debe estar disponible para recibir un pedido
+        -- La mesa debe estar disponible para recibir un pedido
         IF @estado_mesa <> 'DISPONIBLE'
         BEGIN
             DECLARE @msg NVARCHAR(200) =
@@ -482,36 +491,139 @@ BEGIN
         FROM OPENJSON(@json_lineas) j
         INNER JOIN PRODUCTO p ON p.id_producto = CAST(JSON_VALUE(j.value, '$.id_producto') AS INT);
 
+        -- Todas las líneas deben haberse insertado (y debe haber al menos una)
+        DECLARE @insertadas INT = @@ROWCOUNT;
+
+        IF @insertadas = 0 OR @insertadas <> (SELECT COUNT(*) FROM OPENJSON(@json_lineas))
+            THROW 50008, 'El pedido está vacío o tiene productos que no existen.', 1;
+
         -- Calcular subtotal
         UPDATE PEDIDO
         SET subtotal = (SELECT ISNULL(SUM(cantidad * precio_unitario), 0)
                         FROM DETALLE_PEDIDO WHERE id_pedido = @nuevo_id_pedido)
         WHERE id_pedido = @nuevo_id_pedido;
 
-        -- Descontar inventario según la receta de los productos
-        UPDATE i
-        SET i.stock_actual = i.stock_actual - (dp.cantidad * r.cantidad)
-        FROM INSUMO i WITH (UPDLOCK)
-        INNER JOIN RECETA r ON i.id_insumo = r.id_insumo
-        INNER JOIN DETALLE_PEDIDO dp ON r.id_producto = dp.id_producto
-        WHERE dp.id_pedido = @nuevo_id_pedido;
+        -- Consumo total de cada insumo (agrupado: un insumo puede estar en varias líneas)
+        DECLARE @consumo TABLE (id_insumo INT PRIMARY KEY, total DECIMAL(10,2));
 
-        -- Validar que no haya quedado stock negativo
-        IF EXISTS (
-            SELECT 1 FROM INSUMO i
-            INNER JOIN RECETA r ON i.id_insumo = r.id_insumo
-            INNER JOIN DETALLE_PEDIDO dp ON r.id_producto = dp.id_producto
-            WHERE dp.id_pedido = @nuevo_id_pedido AND i.stock_actual < 0
-        )
+        INSERT INTO @consumo (id_insumo, total)
+        SELECT r.id_insumo, SUM(dp.cantidad * r.cantidad)
+        FROM DETALLE_PEDIDO dp
+        INNER JOIN RECETA r ON r.id_producto = dp.id_producto
+        WHERE dp.id_pedido = @nuevo_id_pedido
+        GROUP BY r.id_insumo;
+
+        -- Validar stock antes de descontar
+        DECLARE @insumo_faltante VARCHAR(100);
+
+        SELECT TOP 1 @insumo_faltante = i.nombre_insumo
+        FROM INSUMO i WITH (UPDLOCK)
+        INNER JOIN @consumo c ON c.id_insumo = i.id_insumo
+        WHERE i.stock_actual < c.total;
+
+        IF @insumo_faltante IS NOT NULL
         BEGIN
-            THROW 50002, 'Stock insuficiente de insumos para completar el pedido.', 1;
+            DECLARE @msg_stock NVARCHAR(200) = 'Stock insuficiente del insumo: ' + @insumo_faltante + '.';
+            THROW 50002, @msg_stock, 1;
         END
+
+        -- Descontar inventario
+        UPDATE i
+        SET i.stock_actual = i.stock_actual - c.total
+        FROM INSUMO i
+        INNER JOIN @consumo c ON c.id_insumo = i.id_insumo;
 
         -- Actualizar estado de la mesa
         UPDATE MESA SET estado = 'OCUPADA' WHERE id_mesa = @id_mesa;
 
         COMMIT TRANSACTION;
         RETURN 0;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- Procedimiento 1b: Agregar productos a un pedido abierto (nueva ronda en la misma mesa)
+CREATE PROCEDURE sp_agregar_items_pedido
+    @id_pedido INT,
+    @json_lineas NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Bloquear el pedido y validar que admita más productos
+        DECLARE @estado_pedido VARCHAR(20);
+        SELECT @estado_pedido = estado
+        FROM PEDIDO WITH (UPDLOCK, HOLDLOCK)
+        WHERE id_pedido = @id_pedido;
+
+        IF @estado_pedido IS NULL OR @estado_pedido NOT IN ('ABIERTO', 'EN_PREPARACION', 'LISTO', 'ENTREGADO')
+            THROW 50009, 'El pedido no existe o ya no admite más productos.', 1;
+
+        -- Las líneas nuevas continúan la numeración existente
+        DECLARE @base INT =
+            (SELECT ISNULL(MAX(num_linea), 0) FROM DETALLE_PEDIDO WHERE id_pedido = @id_pedido);
+
+        INSERT INTO DETALLE_PEDIDO (id_pedido, num_linea, id_producto, cantidad, precio_unitario, notas)
+        SELECT
+            @id_pedido,
+            @base + CAST(j.[key] AS INT) + 1,
+            p.id_producto,
+            CAST(JSON_VALUE(j.value, '$.cantidad') AS INT),
+            p.precio,
+            JSON_VALUE(j.value, '$.notas')
+        FROM OPENJSON(@json_lineas) j
+        INNER JOIN PRODUCTO p ON p.id_producto = CAST(JSON_VALUE(j.value, '$.id_producto') AS INT);
+
+        DECLARE @insertadas INT = @@ROWCOUNT;
+
+        IF @insertadas = 0 OR @insertadas <> (SELECT COUNT(*) FROM OPENJSON(@json_lineas))
+            THROW 50008, 'No hay productos que agregar o alguno no existe.', 1;
+
+        -- Consumo de insumos solo de las líneas nuevas
+        DECLARE @consumo TABLE (id_insumo INT PRIMARY KEY, total DECIMAL(10,2));
+
+        INSERT INTO @consumo (id_insumo, total)
+        SELECT r.id_insumo, SUM(dp.cantidad * r.cantidad)
+        FROM DETALLE_PEDIDO dp
+        INNER JOIN RECETA r ON r.id_producto = dp.id_producto
+        WHERE dp.id_pedido = @id_pedido AND dp.num_linea > @base
+        GROUP BY r.id_insumo;
+
+        DECLARE @insumo_faltante VARCHAR(100);
+
+        SELECT TOP 1 @insumo_faltante = i.nombre_insumo
+        FROM INSUMO i WITH (UPDLOCK)
+        INNER JOIN @consumo c ON c.id_insumo = i.id_insumo
+        WHERE i.stock_actual < c.total;
+
+        IF @insumo_faltante IS NOT NULL
+        BEGIN
+            DECLARE @msg_stock NVARCHAR(200) = 'Stock insuficiente del insumo: ' + @insumo_faltante + '.';
+            THROW 50002, @msg_stock, 1;
+        END
+
+        UPDATE i
+        SET i.stock_actual = i.stock_actual - c.total
+        FROM INSUMO i
+        INNER JOIN @consumo c ON c.id_insumo = i.id_insumo;
+
+        -- Nuevo subtotal y el pedido vuelve a ABIERTO (hay trabajo pendiente para cocina)
+        UPDATE PEDIDO
+        SET estado = 'ABIERTO',
+            subtotal = (SELECT SUM(cantidad * precio_unitario)
+                        FROM DETALLE_PEDIDO
+                        WHERE id_pedido = @id_pedido AND estado_cocina <> 'CANCELADO')
+        WHERE id_pedido = @id_pedido;
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -603,6 +715,7 @@ END;
 GO
 
 -- Procedimiento 3: Anular Pedido y Restituir Insumos No Preparados
+--   (devuelve el inventario agrupado por insumo y no permite anular dos veces)
 CREATE PROCEDURE sp_anular_pedido
     @id_pedido INT,
     @id_empleado INT,
@@ -620,16 +733,28 @@ BEGIN
         FROM PEDIDO WITH (UPDLOCK)
         WHERE id_pedido = @id_pedido;
 
-        IF @estado_pedido IS NULL OR @estado_pedido = 'FACTURADO'
-            THROW 50006, 'No se puede anular un pedido inexistente o ya facturado.', 1;
+        IF @estado_pedido IS NULL OR @estado_pedido IN ('FACTURADO', 'ANULADO')
+            THROW 50006, 'No se puede anular un pedido inexistente, ya facturado o ya anulado.', 1;
 
-        -- Reintegrar insumos únicamente para ítems con estado_cocina PENDIENTE
+        -- Insumos a devolver: solo líneas que cocina todavía no empezó (PENDIENTE), agrupados por insumo
+        DECLARE @devolver TABLE (id_insumo INT PRIMARY KEY, total DECIMAL(10,2));
+
+        INSERT INTO @devolver (id_insumo, total)
+        SELECT r.id_insumo, SUM(dp.cantidad * r.cantidad)
+        FROM DETALLE_PEDIDO dp
+        INNER JOIN RECETA r ON r.id_producto = dp.id_producto
+        WHERE dp.id_pedido = @id_pedido AND dp.estado_cocina = 'PENDIENTE'
+        GROUP BY r.id_insumo;
+
         UPDATE i
-        SET i.stock_actual = i.stock_actual + (dp.cantidad * r.cantidad)
+        SET i.stock_actual = i.stock_actual + d.total
         FROM INSUMO i
-        INNER JOIN RECETA r ON i.id_insumo = r.id_insumo
-        INNER JOIN DETALLE_PEDIDO dp ON r.id_producto = dp.id_producto
-        WHERE dp.id_pedido = @id_pedido AND dp.estado_cocina = 'PENDIENTE';
+        INNER JOIN @devolver d ON d.id_insumo = i.id_insumo;
+
+        -- Cancelar líneas pendientes del detalle
+        UPDATE DETALLE_PEDIDO
+        SET estado_cocina = 'CANCELADO'
+        WHERE id_pedido = @id_pedido AND estado_cocina = 'PENDIENTE';
 
         -- Marcar pedido como ANULADO
         UPDATE PEDIDO
@@ -637,11 +762,6 @@ BEGIN
             anulado_por = @id_empleado,
             motivo_anulacion = @motivo
         WHERE id_pedido = @id_pedido;
-
-        -- Cancelar líneas del detalle
-        UPDATE DETALLE_PEDIDO
-        SET estado_cocina = 'CANCELADO'
-        WHERE id_pedido = @id_pedido AND estado_cocina = 'PENDIENTE';
 
         -- Liberar mesa
         UPDATE MESA SET estado = 'DISPONIBLE' WHERE id_mesa = @id_mesa;
@@ -740,6 +860,7 @@ GRANT SELECT ON SCHEMA::dbo TO rol_administrador;
 GRANT SELECT ON vw_menu_activo TO rol_mesero;
 GRANT SELECT ON vw_mesas_estado TO rol_mesero;
 GRANT EXECUTE ON sp_registrar_pedido TO rol_mesero;
+GRANT EXECUTE ON sp_agregar_items_pedido TO rol_mesero;
 
 -- Permisos para Cocinero
 GRANT SELECT ON vw_cola_cocina TO rol_cocinero;

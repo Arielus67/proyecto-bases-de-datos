@@ -36,6 +36,12 @@
                 $esAbierto = $comanda->estado === 'ABIERTO';
                 $claseCard = $esAbierto ? 'estado-abierto' : 'estado-preparacion';
                 $claseBadge = $esAbierto ? 'badge-abierto' : 'badge-preparacion';
+
+                // Cocina solo ve las líneas de la ronda actual (lo que el mesero agregó después)
+                $ronda = $comanda->ronda_actual ?? 1;
+                $lineas = collect($comanda->detalles_con_modificadores)
+                    ->filter(fn ($d) => ($d['ronda'] ?? 1) == $ronda);
+                $horaEnvio = $comanda->ronda_at ?? $comanda->created_at;
             @endphp
 
             <div class="kds-card {{ $claseCard }}">
@@ -57,11 +63,16 @@
                     </div>
 
                     <div class="kds-header-pie">
-                        <span class="kds-badge {{ $claseBadge }}">
-                            {{ str_replace('_', ' ', $comanda->estado) }}
-                        </span>
+                        <div class="kds-badges">
+                            <span class="kds-badge {{ $claseBadge }}">
+                                {{ str_replace('_', ' ', $comanda->estado) }}
+                            </span>
+                            @if ($ronda > 1)
+                                <span class="kds-ronda">Ronda {{ $ronda }}</span>
+                            @endif
+                        </div>
                         <span class="kds-hora">
-                            <i class="ti ti-clock"></i> {{ $comanda->created_at->format('H:i:s') }}
+                            <i class="ti ti-clock"></i> {{ $horaEnvio->format('H:i:s') }}
                         </span>
                     </div>
                 </div>
@@ -70,7 +81,7 @@
                     <h4 class="kds-body-titulo">Productos solicitados</h4>
 
                     <ul class="kds-lista">
-                        @foreach ($comanda->detalles_con_modificadores as $detalle)
+                        @foreach ($lineas as $detalle)
                             <li class="kds-item">
                                 <div class="kds-item-fila">
                                     <span>{{ $nombresProductos[$detalle['id_producto']] ?? 'Producto #' . $detalle['id_producto'] }}</span>

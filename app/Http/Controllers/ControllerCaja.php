@@ -303,14 +303,4 @@ class ControllerCaja extends Controller
             'esperado'       => round($inicial + $efectivo - $vuelto, 2),
         ];
     }
-
-    /** Extrae solo el mensaje de SQL Server (sin la consulta ni los datos de conexión). */
-    private function mensajeSql(\Throwable $e): string
-    {
-        if (preg_match('/\[SQL Server\](.*?)\s*\(Connection:/s', $e->getMessage(), $m)) {
-            return trim($m[1]);
-        }
-
-        return $e->getMessage();
-    }
 }
