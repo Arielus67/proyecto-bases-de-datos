@@ -190,14 +190,14 @@ body.DEFAULT_THEME {
 
 .page-wrapper :is(input, select, textarea).border-gray-300:focus {
     outline: none;
-    border-color: var(--tinta-900);
+    border-color: var(--primario);
     box-shadow: 0 0 0 4px rgb(0 0 0 / 7%);
 }
 
 .page-wrapper input[type="checkbox"].rounded {
     width: 18px;
     height: 18px;
-    accent-color: var(--tinta-900);
+    accent-color: var(--primario);
     cursor: pointer;
 }
 
@@ -281,7 +281,7 @@ html.pestana-bloqueada body {
     height: 52px;
     margin-bottom: 14px;
     border-radius: 50%;
-    background: var(--tinta-900);
+    background: var(--primario);
     color: #fff;
     font-size: 24px;
 }
@@ -314,7 +314,7 @@ html.pestana-bloqueada body {
     width: 14px;
     height: 14px;
     border: 2px solid var(--tinta-300, #d4d4d4);
-    border-top-color: var(--tinta-900);
+    border-top-color: var(--primario);
     border-radius: 50%;
     animation: pestana-gira 900ms linear infinite;
 }

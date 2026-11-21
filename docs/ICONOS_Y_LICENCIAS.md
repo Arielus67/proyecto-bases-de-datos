@@ -106,6 +106,8 @@ Biblioteca: **Tabler Icons** — <https://tabler.io/icons> — repositorio <http
 - DM Sans, SIL OFL 1.1: <https://fontsource.org/fonts/dm-sans/about>
 - JetBrains Mono, SIL OFL 1.1: <https://github.com/JetBrains/JetBrainsMono/blob/master/OFL.txt>
 - SIL Open Font License: <https://openfontlicense.org/>
+- Cormorant Garamond (títulos del login), SIL OFL 1.1: <https://fonts.google.com/specimen/Cormorant+Garamond>
+- Fotografía del login (`public/img/acceso/platillo.jpg`), Unsplash, licencia Unsplash (uso libre, comercial incluido): <https://images.unsplash.com/photo-1473093295043-cdd812d0e601> y <https://unsplash.com/license>
 
 ## 4. Recomendación para funcionar sin Internet
 

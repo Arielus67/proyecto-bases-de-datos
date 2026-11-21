@@ -205,7 +205,7 @@
 }
 
 .kds-ronda {
-    background: var(--tinta-900);
+    background: var(--primario);
     color: #fff;
 }
 
@@ -274,7 +274,7 @@
     min-width: 44px;
     padding: 2px 10px;
     border-radius: var(--radio);
-    background: var(--tinta-900);
+    background: var(--primario);
     color: #fff;
     font-family: var(--fuente-mono);
     font-size: var(--texto-lg);

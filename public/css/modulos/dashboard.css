@@ -124,8 +124,8 @@
     padding-bottom: 0;
     background:
         radial-gradient(120% 90% at 100% 0%, rgb(255 255 255 / 9%), transparent 55%),
-        linear-gradient(160deg, #1f1f1f, #0b0b0b);
-    border-color: #0b0b0b;
+        linear-gradient(160deg, #2b5a46, #183729);
+    border-color: #183729;
     color: #fff;
 }
 
@@ -304,7 +304,7 @@
 }
 
 .anillo__progreso {
-    stroke: var(--tinta-900);
+    stroke: var(--primario);
     stroke-linecap: round;
     stroke-dasharray: 100;
     stroke-dashoffset: calc(100 - var(--valor, 0));
@@ -486,8 +486,8 @@
 }
 
 .plano__mesa--ocupada {
-    border-color: var(--tinta-900);
-    background: var(--tinta-900);
+    border-color: var(--primario);
+    background: var(--primario);
     color: #fff;
 }
 
@@ -513,7 +513,7 @@
 }
 
 .punto--ocupada {
-    background: var(--tinta-900);
+    background: var(--primario);
 }
 
 .punto--libre {
@@ -678,7 +678,7 @@
 .estado--en_preparacion { background: var(--info-50); color: var(--info-700); }
 .estado--listo { background: var(--exito-50); color: var(--exito-700); }
 .estado--entregado { background: var(--superficie-hundida); color: var(--texto); }
-.estado--facturado { background: var(--tinta-900); color: #fff; }
+.estado--facturado { background: var(--primario); color: #fff; }
 .estado--anulado { background: var(--peligro-50); color: var(--peligro-700); }
 
 .ranking {
@@ -708,7 +708,7 @@
 }
 
 .ranking__item:first-child .ranking__posicion {
-    background: var(--tinta-900);
+    background: var(--primario);
     color: #fff;
 }
 
@@ -755,7 +755,7 @@
     width: var(--valor, 0%);
     height: 100%;
     border-radius: inherit;
-    background: var(--tinta-900);
+    background: var(--primario);
     transform-origin: left;
     animation: barra-crecer 900ms cubic-bezier(0.22, 1, 0.36, 1) 600ms both;
 }

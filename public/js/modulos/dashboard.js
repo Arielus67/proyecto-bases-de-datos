@@ -25,7 +25,7 @@
 
     function colorBarras(contexto) {
         const ultimo = contexto.dataIndex === totales.length - 1;
-        return ultimo ? '#171717' : '#d4d4d4';
+        return ultimo ? '#234C3B' : '#C9D8CE';
     }
 
     function configuracion(tipo) {
@@ -40,9 +40,9 @@
                         label: 'Ventas',
                         data: totales,
                         order: 2,
-                        backgroundColor: esLinea ? 'rgba(23, 23, 23, 0.08)' : colorBarras,
-                        hoverBackgroundColor: esLinea ? 'rgba(23, 23, 23, 0.12)' : '#404040',
-                        borderColor: '#171717',
+                        backgroundColor: esLinea ? 'rgba(35, 76, 59, 0.10)' : colorBarras,
+                        hoverBackgroundColor: esLinea ? 'rgba(35, 76, 59, 0.16)' : '#536B45',
+                        borderColor: '#234C3B',
                         borderWidth: esLinea ? 2.5 : 0,
                         borderRadius: 8,
                         borderSkipped: false,
@@ -53,7 +53,7 @@
                         pointRadius: esLinea ? 3.5 : 0,
                         pointHoverRadius: 6,
                         pointBackgroundColor: '#fff',
-                        pointBorderColor: '#171717',
+                        pointBorderColor: '#234C3B',
                         pointBorderWidth: 2
                     },
                     {
@@ -61,7 +61,7 @@
                         data: totales.map(() => promedio),
                         type: 'line',
                         order: 1,
-                        borderColor: '#9e9e9e',
+                        borderColor: '#C5A56A',
                         borderWidth: 1.5,
                         borderDash: [6, 5],
                         pointRadius: 0,
@@ -78,7 +78,7 @@
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: '#0a0a0a',
+                        backgroundColor: '#183729',
                         padding: 12,
                         cornerRadius: 10,
                         titleFont: { weight: '700' },

@@ -4,7 +4,7 @@
 @endphp
 <div class="bienvenida" id="bienvenida">
     <div class="bienvenida__marca" aria-hidden="true">
-        <span class="bienvenida__logo"><i class="ti ti-tools-kitchen-2"></i></span>
+        <span class="bienvenida__logo"><img src="{{ asset('img/marca/emblema-claro.svg') }}" alt="" width="64" height="64"></span>
         <span class="bienvenida__nombre">{{ mb_strtoupper(config('app.name')) }}</span>
         <span class="bienvenida__carga"></span>
     </div>

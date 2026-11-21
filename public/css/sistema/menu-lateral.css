@@ -34,8 +34,9 @@
     width: 36px;
     height: 36px;
     border-radius: var(--radio);
-    background: linear-gradient(135deg, var(--marca-400), var(--marca-600));
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%), 0 6px 14px -6px rgb(0 0 0 / 70%);
+    background: url("../../img/marca/emblema-claro.svg") center / contain no-repeat;
+    border-radius: 50%;
+    box-shadow: 0 6px 14px -6px rgb(0 0 0 / 45%);
     color: #fff;
     font-size: 20px;
 }
@@ -214,7 +215,7 @@
 }
 
 .lateral__contraer:hover {
-    background: #2a2a2a;
+    background: var(--marca-500);
 }
 
 .lateral__texto,

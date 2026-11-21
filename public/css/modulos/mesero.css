@@ -718,8 +718,8 @@
 }
 
 .menu-chip.activa {
-    background: var(--tinta-900);
-    border-color: var(--tinta-900);
+    background: var(--primario);
+    border-color: var(--primario);
     color: #fff;
 }
 
@@ -848,7 +848,7 @@
     padding: 0 var(--esp-4);
     border: 0;
     border-radius: var(--radio);
-    background: var(--tinta-900);
+    background: var(--primario);
     color: #fff;
     font-weight: 600;
     transition: background-color var(--duracion-rapida) var(--curva), transform var(--duracion-rapida) var(--curva);

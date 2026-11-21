@@ -86,7 +86,7 @@ body.DEFAULT_THEME::after {
     border-color: rgb(255 255 255 / 14%);
     background:
         radial-gradient(120% 90% at 100% 0%, rgb(255 255 255 / 12%), transparent 55%),
-        linear-gradient(160deg, rgb(28 28 28 / 78%), rgb(8 8 8 / 82%));
+        linear-gradient(160deg, rgb(43 90 70 / 82%), rgb(24 55 41 / 88%));
     box-shadow: 0 1px 0 rgb(255 255 255 / 12%) inset, 0 22px 44px -24px rgb(0 0 0 / 60%);
 }
 
@@ -110,8 +110,8 @@ body.DEFAULT_THEME::after {
 }
 
 .page-wrapper .plano__mesa--ocupada {
-    border-color: rgb(10 10 10 / 70%);
-    background: rgb(12 12 12 / 82%);
+    border-color: rgb(24 55 41 / 75%);
+    background: rgb(35 76 59 / 88%);
 }
 
 .page-wrapper .segmentado__opcion.activo {

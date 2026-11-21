@@ -20,8 +20,8 @@
     align-content: center;
     gap: 22px;
     background:
-        radial-gradient(45% 35% at 50% 50%, rgb(255 255 255 / 6%), transparent 70%),
-        #070707;
+        radial-gradient(45% 35% at 50% 50%, rgb(197 165 106 / 10%), transparent 70%),
+        #183729;
     color: #fff;
     -webkit-mask: radial-gradient(circle at 50% 46%, transparent var(--revelado), #000 calc(var(--revelado) + 16vmax));
     mask: radial-gradient(circle at 50% 46%, transparent var(--revelado), #000 calc(var(--revelado) + 16vmax));
@@ -49,7 +49,7 @@
     width: 64px;
     height: 64px;
     border-radius: 18px;
-    background: linear-gradient(160deg, #3b3b3b, #121212);
+    background: linear-gradient(160deg, #2f6450, #183729);
     box-shadow: 0 0 0 1px rgb(255 255 255 / 10%), 0 18px 40px -12px rgb(0 0 0 / 80%);
     font-size: 32px;
 }

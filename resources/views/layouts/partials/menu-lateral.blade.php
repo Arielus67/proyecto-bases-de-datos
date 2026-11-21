@@ -46,10 +46,10 @@
     </button>
 
     <a href="{{ route('inicio') }}" class="lateral__marca">
-        <span class="marca-logo"><i class="ti ti-tools-kitchen-2"></i></span>
+        <span class="marca-logo" aria-hidden="true"></span>
         <span class="marca-texto">
             <strong>{{ config('app.name') }}</strong>
-            <small>Gestión de servicio</small>
+            <small>Restaurante</small>
         </span>
     </a>
 

@@ -1,30 +1,32 @@
 :root {
-    --marca-50: #f7f7f7;
-    --marca-100: #ececec;
-    --marca-200: #d9d9d9;
-    --marca-300: #bdbdbd;
-    --marca-400: #8f8f8f;
-    --marca-500: #555555;
-    --marca-600: #171717;
-    --marca-700: #262626;
-    --marca-800: #0d0d0d;
-    --marca-900: #000000;
+    /* Paleta de marca: La Cuchara de Luisón
+       Verde bosque #234C3B · Verde oliva #536B45 · Dorado #C5A56A · Crema #F7F2E8 */
+    --marca-50: #f1f5f2;
+    --marca-100: #e2ebe5;
+    --marca-200: #c4d6ca;
+    --marca-300: #9bb9a6;
+    --marca-400: #5f8a71;
+    --marca-500: #536b45;
+    --marca-600: #234c3b;
+    --marca-700: #1b3d2f;
+    --marca-800: #142e23;
+    --marca-900: #0e2119;
 
-    --acento-100: #f0f0f0;
-    --acento-400: #e5e5e5;
-    --acento-500: #737373;
-    --acento-700: #404040;
+    --acento-100: #f5eedf;
+    --acento-400: #e9dcc0;
+    --acento-500: #c5a56a;
+    --acento-700: #8c6f3a;
 
-    --tinta-950: #0a0a0a;
-    --tinta-900: #171717;
-    --tinta-800: #262626;
-    --tinta-700: #404040;
-    --tinta-500: #6b6b6b;
-    --tinta-400: #9e9e9e;
-    --tinta-300: #cfcfcf;
-    --tinta-200: #e3e3e3;
-    --tinta-100: #efefef;
-    --tinta-50: #f6f6f6;
+    --tinta-950: #0e1d16;
+    --tinta-900: #1a2b23;
+    --tinta-800: #253830;
+    --tinta-700: #3d4d45;
+    --tinta-500: #67716b;
+    --tinta-400: #9aa29c;
+    --tinta-300: #cdd3ce;
+    --tinta-200: #e2e5df;
+    --tinta-100: #eef0eb;
+    --tinta-50: #f7f6f1;
 
     --exito-50: #ecf8f0;
     --exito-200: #b6e3c4;
@@ -45,7 +47,7 @@
 
     --fondo: var(--tinta-50);
     --superficie: #ffffff;
-    --superficie-suave: #fafafa;
+    --superficie-suave: #fbfaf6;
     --superficie-hundida: var(--tinta-100);
     --borde: var(--tinta-200);
     --borde-suave: var(--tinta-100);
@@ -54,18 +56,18 @@
     --texto-suave: var(--tinta-500);
     --texto-tenue: var(--tinta-400);
     --primario: var(--marca-600);
-    --primario-hover: #3a3a3a;
+    --primario-hover: var(--marca-700);
     --primario-suave: var(--marca-100);
-    --primario-texto: var(--marca-900);
+    --primario-texto: var(--marca-700);
     --sobre-primario: #ffffff;
-    --foco: 0 0 0 3px rgb(0 0 0 / 16%);
+    --foco: 0 0 0 3px rgb(35 76 59 / 20%);
 
-    --lateral-fondo: #0a0a0a;
-    --lateral-fondo-2: #161616;
-    --lateral-texto: #a8a8a8;
+    --lateral-fondo: #183729;
+    --lateral-fondo-2: #234c3b;
+    --lateral-texto: #b9cbbf;
     --lateral-texto-fuerte: #ffffff;
-    --lateral-activo: rgb(255 255 255 / 10%);
-    --lateral-borde: rgb(255 255 255 / 7%);
+    --lateral-activo: rgb(197 165 106 / 18%);
+    --lateral-borde: rgb(247 242 232 / 10%);
 
     --fuente-titulo: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
     --fuente-texto: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
