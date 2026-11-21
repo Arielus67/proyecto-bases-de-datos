@@ -7,7 +7,8 @@ use MongoDB\Laravel\Eloquent\Model;
 class BitacoraEventoNoSql extends Model
 {
     protected $connection = 'mongodb';
-    protected $collection = 'bitacora_eventos';
+    // laravel-mongodb 5 usa $table como nombre de la colección ($collection ya no se lee)
+    protected $table = 'bitacora_eventos';
 
     protected $fillable = [
         'evento',

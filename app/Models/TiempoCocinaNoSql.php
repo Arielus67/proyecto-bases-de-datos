@@ -7,7 +7,8 @@ use MongoDB\Laravel\Eloquent\Model;
 class TiempoCocinaNoSql extends Model
 {
     protected $connection = 'mongodb';
-    protected $collection = 'tiempos_cocina';
+    // laravel-mongodb 5 usa $table como nombre de la colección ($collection ya no se lee)
+    protected $table = 'tiempos_cocina';
 
     protected $fillable = [
         'id_pedido_sql',

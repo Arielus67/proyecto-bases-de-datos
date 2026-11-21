@@ -1948,12 +1948,31 @@ BEGIN
         IF @fecha_inicio IS NULL OR @fecha_fin IS NULL OR @fecha_fin < @fecha_inicio
             THROW 50056, 'El rango de fechas del reporte no es válido.', 1
 
-        IF @agrupar_por NOT IN ('DIA', 'PRODUCTO', 'MESERO', 'PAGO')
-            THROW 50057, 'Agrupación no válida. Use DIA, PRODUCTO, MESERO o PAGO.', 1
+        IF @agrupar_por NOT IN ('FACTURA', 'DIA', 'PRODUCTO', 'MESERO', 'PAGO')
+            THROW 50057, 'Agrupación no válida. Use FACTURA, DIA, PRODUCTO, MESERO o PAGO.', 1
 
         SET TRANSACTION ISOLATION LEVEL SNAPSHOT
 
-        IF @agrupar_por = 'DIA'
+        IF @agrupar_por = 'FACTURA'
+        BEGIN
+            SELECT
+                f.numero_factura AS Factura,
+                f.fecha_hora AS Fecha_Hora,
+                m.numero_mesa AS Mesa,
+                cj.nombre + ' ' + cj.apellido AS Cajero,
+                f.subtotal AS Subtotal,
+                f.descuento AS Descuento,
+                f.impuesto_ventas AS IVA,
+                f.servicio AS Servicio,
+                f.total AS Total
+            FROM dbo.FACTURA f
+            INNER JOIN dbo.PEDIDO p ON f.id_pedido = p.id_pedido
+            INNER JOIN dbo.MESA m ON p.id_mesa = m.id_mesa
+            INNER JOIN dbo.EMPLEADO cj ON f.id_empleado = cj.id_empleado
+            WHERE f.fecha_hora BETWEEN @fecha_inicio AND @fecha_fin AND f.estado = 'COBRADA'
+            ORDER BY f.fecha_hora ASC
+        END
+        ELSE IF @agrupar_por = 'DIA'
         BEGIN
             SELECT
                 CAST(f.fecha_hora AS DATE) AS Fecha,
@@ -1980,6 +1999,7 @@ BEGIN
             INNER JOIN dbo.FACTURA f ON ped.id_pedido = f.id_pedido
             WHERE f.fecha_hora BETWEEN @fecha_inicio AND @fecha_fin AND f.estado = 'COBRADA'
             GROUP BY p.nombre_producto
+            ORDER BY Ranking ASC, p.nombre_producto ASC
         END
         ELSE IF @agrupar_por = 'MESERO'
         BEGIN

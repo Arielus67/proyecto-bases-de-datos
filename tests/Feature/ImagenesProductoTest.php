@@ -6,6 +6,7 @@ use App\Support\Sp;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use Tests\Concerns\EsquemaSqlite;
 use Tests\TestCase;
 
@@ -76,6 +77,7 @@ class ImagenesProductoTest extends TestCase
             ->assertSee('menu-producto__imagen--vacia', false);                          // los demás no
     }
 
+    #[RequiresPhpExtension('gd')]
     public function test_rechaza_archivos_que_no_son_imagen_o_demasiado_grandes(): void
     {
         $producto = $this->producto('Casado');

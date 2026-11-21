@@ -25,24 +25,55 @@
     @elseif ($filas->isEmpty())
         <p class="text-gray-500">No hay ventas cobradas en el período seleccionado.</p>
     @else
+        @php
+            $formatear = function ($valor, string $tipo) {
+                return match ($tipo) {
+                    'dinero'     => '₡' . number_format((float) $valor, 2),
+                    'cantidad', 'entero' => number_format((float) $valor, 0),
+                    'fecha_hora' => \Carbon\Carbon::parse($valor)->format('d/m/Y H:i'),
+                    default      => $valor,
+                };
+            };
+        @endphp
+
+        <p class="mb-3 text-sm text-gray-500">
+            {{ $filas->count() }} {{ $filas->count() === 1 ? 'fila' : 'filas' }} · {{ $agrupaciones[$agrupar] }}
+            · del {{ \Carbon\Carbon::parse($inicio)->format('d/m/Y') }} al {{ \Carbon\Carbon::parse($fin)->format('d/m/Y') }}
+        </p>
+
         <div class="overflow-x-auto bg-white border border-gray-200 rounded-lg shadow-sm">
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-50 text-left">
                     <tr>
-                        @foreach (array_keys($filas->first()) as $columna)
-                            <th class="px-4 py-2 font-semibold text-gray-600">{{ str_replace('_', ' ', $columna) }}</th>
+                        @foreach ($columnas as $columna)
+                            <th class="px-4 py-2 font-semibold text-gray-600 {{ $tipos[$columna] === 'texto' || $tipos[$columna] === 'fecha_hora' ? '' : 'text-right' }}">{{ str_replace('_', ' ', $columna) }}</th>
                         @endforeach
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($filas as $fila)
                         <tr class="border-t border-gray-100">
-                            @foreach ($fila as $valor)
-                                <td class="px-4 py-2">{{ is_numeric($valor) ? number_format((float) $valor, 2) : $valor }}</td>
+                            @foreach ($columnas as $columna)
+                                <td class="px-4 py-2 {{ $tipos[$columna] === 'texto' || $tipos[$columna] === 'fecha_hora' ? '' : 'text-right num' }}">{{ $formatear($fila[$columna], $tipos[$columna]) }}</td>
                             @endforeach
                         </tr>
                     @endforeach
                 </tbody>
+                @if ($filas->count() > 1 && $totales)
+                    <tfoot>
+                        <tr class="border-t-2 border-gray-200 font-semibold">
+                            @foreach ($columnas as $i => $columna)
+                                <td class="px-4 py-2 {{ array_key_exists($columna, $totales) ? 'text-right num' : '' }}">
+                                    @if (array_key_exists($columna, $totales))
+                                        {{ $formatear($totales[$columna], $tipos[$columna]) }}
+                                    @elseif ($i === 0)
+                                        Total
+                                    @endif
+                                </td>
+                            @endforeach
+                        </tr>
+                    </tfoot>
+                @endif
             </table>
         </div>
     @endif

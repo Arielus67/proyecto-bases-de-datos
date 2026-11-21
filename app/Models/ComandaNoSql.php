@@ -9,7 +9,8 @@ use MongoDB\Laravel\Eloquent\Model;
 class ComandaNoSql extends Model
 {
     protected $connection = 'mongodb';
-    protected $collection = 'comandas';
+    // laravel-mongodb 5 usa $table como nombre de la colección ($collection ya no se lee)
+    protected $table = 'comandas';
 
     /** Comandas que se descartan (pedido inexistente o de una base anterior) se guardan aquí, no se borran. */
     public const COLECCION_ARCHIVO = 'comandas_archivadas';
