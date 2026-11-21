@@ -50,7 +50,7 @@
     height: 8px;
     border-radius: 50%;
     background: var(--exito-600);
-    box-shadow: 0 0 0 0 rgb(22 163 74 / 50%);
+    box-shadow: 0 0 0 0 rgb(62 124 79 / 50%);
     animation: latido 2s var(--curva) infinite;
 }
 
@@ -60,8 +60,8 @@
 }
 
 @keyframes latido {
-    0% { box-shadow: 0 0 0 0 rgb(22 163 74 / 45%); }
-    70%, 100% { box-shadow: 0 0 0 8px rgb(22 163 74 / 0%); }
+    0% { box-shadow: 0 0 0 0 rgb(62 124 79 / 45%); }
+    70%, 100% { box-shadow: 0 0 0 8px rgb(62 124 79 / 0%); }
 }
 
 .kds-grid {
@@ -391,11 +391,11 @@
     align-items: center;
     gap: 10px;
     padding: 12px 16px;
-    border: 1px solid var(--advertencia-200, #fde68a);
-    border-left: 4px solid var(--advertencia-600, #d97706);
+    border: 1px solid var(--aviso-200);
+    border-left: 4px solid var(--aviso-600);
     border-radius: var(--radio-md, 10px);
-    background: var(--advertencia-50, #fffbeb);
-    color: var(--advertencia-700, #b45309);
+    background: var(--aviso-50);
+    color: var(--aviso-700);
     font-size: 0.9rem;
     font-weight: 500;
 }

@@ -113,6 +113,7 @@ Route::middleware(['auth', 'can:caja.usar', 'rol.sql:cajero'])->group(function (
     Route::get('/caja/facturas', [ControllerCaja::class, 'facturas'])->name('caja.facturas');
     Route::post('/caja/cobrar/{id}', [ControllerCaja::class, 'cobrar'])->name('caja.cobrar');
     Route::get('/caja/ticket/{numero}', [ControllerCaja::class, 'ticket'])->name('caja.ticket');
+    Route::post('/caja/turnos/abrir', [ControllerCaja::class, 'abrirTurno'])->name('caja.turno.abrir');
     Route::get('/caja/turnos/{id}/resumen', [ControllerCaja::class, 'resumenTurno'])->name('caja.turno.resumen');
     Route::post('/caja/turnos/{id}/cerrar', [ControllerCaja::class, 'cerrarTurno'])->name('caja.turno.cerrar');
 });

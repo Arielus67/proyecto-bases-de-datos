@@ -264,13 +264,13 @@
 }
 
 .variacion--sube {
-    background: rgb(22 163 74 / 18%);
-    color: #4ade80;
+    background: rgb(143 201 158 / 18%);
+    color: #a9dcb5;
 }
 
 .variacion--baja {
-    background: rgb(220 38 38 / 20%);
-    color: #fca5a5;
+    background: rgb(239 160 146 / 20%);
+    color: #f2b8ae;
 }
 
 .kpi__ocupacion {

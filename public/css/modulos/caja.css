@@ -289,6 +289,10 @@
     font-size: var(--texto-sm);
 }
 
+.cobro-alerta__form {
+    margin-top: var(--esp-2);
+}
+
 .cobro-alerta a {
     font-weight: 700;
     text-decoration: underline;

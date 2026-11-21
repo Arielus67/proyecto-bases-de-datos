@@ -50,3 +50,22 @@
     :where(.md\:grid-cols-3) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     :where(.md\:col-span-2) { grid-column: span 2 / span 2; }
 }
+
+/* Grises de Tailwind (con matiz azul) -> neutros cálidos de la paleta */
+:where(.text-gray-400) { color: var(--texto-tenue); }
+:where(.text-gray-500) { color: var(--texto-suave); }
+:where(.text-gray-600) { color: var(--texto-medio); }
+:where(.text-gray-900) { color: var(--texto); }
+:where(.border-gray-100) { border-color: var(--borde-suave); }
+:where(.border-gray-200) { border-color: var(--borde); }
+:where(.bg-gray-50) { background-color: var(--superficie-suave); }
+:where(.bg-gray-100) { background-color: var(--superficie-hundida); }
+:where(.text-red-600) { color: var(--peligro-600); }
+
+/* Badges (x-admin.badge): fondos suaves de los estados de la paleta */
+:where(.bg-green-100) { background-color: var(--exito-50); }
+:where(.bg-red-100) { background-color: var(--peligro-50); }
+:where(.bg-yellow-100) { background-color: var(--aviso-50); }
+:where(.text-yellow-700) { color: var(--aviso-700); }
+:where(.bg-blue-100) { background-color: var(--info-50); }
+:where(.text-blue-700) { color: var(--info-700); }

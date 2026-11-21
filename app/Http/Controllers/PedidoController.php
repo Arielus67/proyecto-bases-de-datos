@@ -64,7 +64,7 @@ class PedidoController extends Controller
 
         // SQL ya quedó confirmado; la comanda deja de aparecer en cocina
         try {
-            ComandaNoSql::where('id_pedido_sql', (int) $pedido->id_pedido)->update(['estado' => 'ANULADO']);
+            ComandaNoSql::delPedido((int) $pedido->id_pedido)?->update(['estado' => 'ANULADO']);
 
             BitacoraEventoNoSql::create([
                 'evento'     => 'PEDIDO_ANULADO',

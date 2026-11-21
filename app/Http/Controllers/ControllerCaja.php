@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BitacoraEventoNoSql;
 use App\Models\ComandaNoSql;
 use App\Models\MetodoPago;
+use App\Support\TurnoAutomatico;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,19 +60,39 @@ class ControllerCaja extends Controller
             ->join('EMPLEADO as e', 'e.id_empleado', '=', 't.id_empleado')
             ->whereNull('t.fecha_cierre')
             ->when(! $empleado->can('caja.supervisar'), fn ($q) => $q->where('t.id_empleado', $empleado->id_empleado))
-            ->select('t.id_turno', 'e.id_empleado', DB::raw("CONCAT(e.nombre, ' ', e.apellido) as nombre"))
-            ->get();
+            ->select('t.id_turno', 'e.id_empleado', 'e.nombre', 'e.apellido')
+            ->get()
+            ->map(fn ($c) => (object) ['id_turno' => $c->id_turno, 'id_empleado' => $c->id_empleado, 'nombre' => trim($c->nombre . ' ' . $c->apellido)]);
 
         $metodos = MetodoPago::orderBy('nombre_metodo')->get(['id_metodo_pago', 'nombre_metodo']);
 
         $clientes = $sql->table('CLIENTE')
             ->orderBy('apellido')->orderBy('nombre')
-            ->select('id_cliente', DB::raw("CONCAT(nombre, ' ', apellido) as nombre"))
-            ->get();
+            ->select('id_cliente', 'nombre', 'apellido')
+            ->get()
+            ->map(fn ($c) => (object) ['id_cliente' => $c->id_cliente, 'nombre' => trim($c->nombre . ' ' . $c->apellido)]);
 
         $supervisaCajas = $empleado->can('caja.supervisar');
 
         return view('cajero.facturas.index', compact('pedidos', 'pedidosJs', 'cajeros', 'metodos', 'clientes', 'supervisaCajas'));
+    }
+
+    /** El cajero abre su propio turno (por ejemplo, después de cerrar el anterior) sin pedírselo al administrador. */
+    public function abrirTurno(Request $request)
+    {
+        try {
+            $idTurno = TurnoAutomatico::abrirSiFalta($request->user());
+        } catch (\Throwable $e) {
+            Log::error('Error al abrir turno de caja', ['empleado' => $request->user()->id_empleado, 'error' => $e->getMessage()]);
+
+            return back()->with('error', 'No se pudo abrir el turno: ' . $this->mensajeSql($e));
+        }
+
+        if (! $idTurno) {
+            return back()->with('error', 'Solo un empleado registrado como cajero puede abrir un turno de caja.');
+        }
+
+        return redirect()->route('caja.index')->with('success', 'Turno #' . $idTurno . ' abierto.');
     }
 
     public function facturas(Request $request)
@@ -174,7 +195,7 @@ class ControllerCaja extends Controller
 
         // El cobro en SQL ya se confirmó. Si MongoDB falla, no se revierte la factura.
         try {
-            $comanda = ComandaNoSql::where('id_pedido_sql', $idPedido)->first();
+            $comanda = ComandaNoSql::delPedido($idPedido);
 
             if ($comanda) {
                 $comanda->estado = 'FACTURADO';
@@ -340,13 +361,14 @@ class ControllerCaja extends Controller
         $turno = $sql->table('TURNO_CAJA as t')
             ->join('EMPLEADO as e', 'e.id_empleado', '=', 't.id_empleado')
             ->where('t.id_turno', $idTurno)
-            ->select('t.id_turno', 't.fecha_apertura', 't.fecha_cierre', 't.monto_inicial',
-                DB::raw("CONCAT(e.nombre, ' ', e.apellido) as cajero"))
+            ->select('t.id_turno', 't.fecha_apertura', 't.fecha_cierre', 't.monto_inicial', 'e.nombre', 'e.apellido')
             ->first();
 
         if (!$turno) {
             return null;
         }
+
+        $turno->cajero = trim($turno->nombre . ' ' . $turno->apellido);
 
         $totales = $sql->table('FACTURA')
             ->where('id_turno', $idTurno)

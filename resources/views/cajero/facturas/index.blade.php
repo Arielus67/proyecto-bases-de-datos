@@ -8,6 +8,8 @@
 
 @section('contenido')
 
+    <x-admin.flash />
+
     <div class="caja-barra">
         <a href="{{ route('caja.facturas') }}" class="btn-turno">
             <i class="ti ti-file-invoice"></i> Facturas emitidas
@@ -59,7 +61,11 @@
                                     <a href="{{ route('admin.turnos.create') }}">Abrir un turno</a>
                                 @endaccesible
                             @else
-                                No tienes un turno de caja abierto. Solicita al administrador que lo abra para poder cobrar.
+                                No tienes un turno de caja abierto.
+                                <form method="POST" action="{{ route('caja.turno.abrir') }}" class="cobro-alerta__form">
+                                    @csrf
+                                    <button type="submit" class="btn-turno"><i class="ti ti-lock-open"></i> Abrir mi turno</button>
+                                </form>
                             @endif
                         </div>
                     @endif

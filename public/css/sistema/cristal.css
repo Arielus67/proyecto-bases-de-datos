@@ -26,13 +26,13 @@ body.DEFAULT_THEME::after {
 
 body.DEFAULT_THEME::before {
     background: url("../../img/fondos/pinos.jpg") center 62% / cover no-repeat;
-    filter: blur(8px) saturate(115%);
+    filter: blur(8px) saturate(105%) sepia(22%);
     transform: scale(1.08);
 }
 
 body.DEFAULT_THEME::after {
     background:
-        linear-gradient(180deg, rgb(244 247 245 / 30%) 0%, rgb(244 247 245 / 18%) 45%, rgb(20 35 28 / 22%) 100%);
+        linear-gradient(180deg, rgb(247 242 232 / 42%) 0%, rgb(247 242 232 / 20%) 45%, rgb(20 35 28 / 22%) 100%);
 }
 
 #main-wrapper .page-wrapper {
@@ -41,7 +41,7 @@ body.DEFAULT_THEME::after {
 
 #main-wrapper .page-wrapper > div > header {
     border-bottom-color: var(--cristal-borde);
-    background: rgb(255 255 255 / 58%);
+    background: rgb(251 249 243 / 72%);
     -webkit-backdrop-filter: var(--cristal-desenfoque);
     backdrop-filter: var(--cristal-desenfoque);
 }
@@ -73,13 +73,13 @@ body.DEFAULT_THEME::after {
 }
 
 .page-wrapper .bg-white.border.border-red-200.rounded-lg {
-    border-color: rgb(254 202 202 / 85%);
-    background: linear-gradient(180deg, rgb(254 242 242 / 70%), var(--cristal-fondo) 70%);
+    border-color: rgb(239 197 190 / 85%);
+    background: linear-gradient(180deg, rgb(251 238 236 / 70%), var(--cristal-fondo) 70%);
 }
 
 .page-wrapper .kpi--alerta {
-    border-color: rgb(254 202 202 / 85%);
-    background: linear-gradient(180deg, rgb(254 242 242 / 72%), var(--cristal-fondo) 70%);
+    border-color: rgb(239 197 190 / 85%);
+    background: linear-gradient(180deg, rgb(251 238 236 / 72%), var(--cristal-fondo) 70%);
 }
 
 .page-wrapper .kpi--principal {
@@ -146,11 +146,11 @@ body.DEFAULT_THEME::after {
 }
 
 .page-wrapper .bg-green-50.border-green-200 {
-    background: rgb(240 253 244 / 82%);
+    background: rgb(238 245 239 / 82%);
 }
 
 .page-wrapper .bg-red-50.border-red-200 {
-    background: rgb(254 242 242 / 82%);
+    background: rgb(251 238 236 / 82%);
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -164,6 +164,6 @@ body.DEFAULT_THEME::after {
     :root {
         --cristal-fondo: rgb(255 255 255 / 94%);
         --cristal-fondo-hover: #fff;
-        --cristal-interior: rgb(250 250 250 / 96%);
+        --cristal-interior: rgb(251 250 246 / 96%);
     }
 }

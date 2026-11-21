@@ -12,6 +12,9 @@ return [
 
     'sesion_unica_minutos' => (int) env('SESION_UNICA_MINUTOS', 5),
 
+    // Fondo de caja con el que se abre automáticamente el turno del cajero al iniciar sesión
+    'caja_monto_inicial' => (float) env('CAJA_MONTO_INICIAL', 0),
+
     // Carpeta dentro de public/ donde se guardan las fotos de los productos
     'carpeta_fotos' => 'img/productos',
 

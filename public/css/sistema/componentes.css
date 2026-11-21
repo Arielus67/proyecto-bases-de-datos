@@ -748,7 +748,7 @@ a.paginacion__pagina:hover {
     height: 8px;
     border-radius: 50%;
     background: currentColor;
-    box-shadow: 0 0 0 3px rgb(29 138 74 / 15%);
+    box-shadow: 0 0 0 3px rgb(62 124 79 / 15%);
     animation: pulso 2s ease-in-out infinite;
 }
 

@@ -253,7 +253,7 @@ body.DEFAULT_THEME {
     display: grid;
     place-items: center;
     padding: 16px;
-    background: rgb(10 10 10 / 55%);
+    background: rgb(14 29 22 / 55%);
     -webkit-backdrop-filter: blur(10px) saturate(120%);
     backdrop-filter: blur(10px) saturate(120%);
     animation: alerta-entra 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
@@ -313,7 +313,7 @@ html.pestana-bloqueada body {
 .pestana-duplicada__espera span {
     width: 14px;
     height: 14px;
-    border: 2px solid var(--tinta-300, #d4d4d4);
+    border: 2px solid var(--tinta-300, #cdd3ce);
     border-top-color: var(--primario);
     border-radius: 50%;
     animation: pestana-gira 900ms linear infinite;

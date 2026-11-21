@@ -19,9 +19,10 @@ class ControllerCocina extends Controller
         $sinMongo = false;
 
         try {
+            $this->conciliarComandasActivas();
             $this->recuperarComandasPerdidas();
 
-            $comandas = ComandaNoSql::whereIn('estado', ['ABIERTO', 'EN_PREPARACION'])
+            $comandas = ComandaNoSql::whereIn('estado', ComandaNoSql::ESTADOS_COCINA)
                 ->orderBy('created_at', 'asc')
                 ->get();
         } catch (\Throwable $e) {
@@ -118,6 +119,13 @@ class ControllerCocina extends Controller
         $idPedidoSql = (int) $comandaMongo->id_pedido_sql;
         $sql = DB::connection('sqlsrv');
 
+        // Comanda fantasma: su pedido no existe en SQL Server (o es otro con el mismo número)
+        if (! $comandaMongo->correspondeA(ComandaNoSql::pedidoSql($idPedidoSql))) {
+            $comandaMongo->archivar('El pedido no existe en SQL Server');
+
+            return response()->json(['success' => false, 'message' => 'Esta comanda no corresponde a ningún pedido registrado y se retiró de cocina.'], 409);
+        }
+
         // Estado que se refleja en las líneas del pedido (DETALLE_PEDIDO.estado_cocina)
         $estadoLinea   = $nuevoEstado === 'LISTO' ? 'LISTO' : 'PREPARANDO';
         $lineasOrigen  = $nuevoEstado === 'LISTO' ? ['PENDIENTE', 'PREPARANDO'] : ['PENDIENTE'];
@@ -197,6 +205,44 @@ class ControllerCocina extends Controller
     }
 
     /**
+     * Evita comandas fantasma: cada comanda activa en MongoDB debe tener su pedido en SQL Server
+     * (mismo número y mismo token). Las que no lo tienen se archivan; si el pedido ya avanzó
+     * (LISTO, FACTURADO, ANULADO...) se copia ese estado para que deje de mostrarse en cocina.
+     */
+    private function conciliarComandasActivas(): void
+    {
+        try {
+            $activas = ComandaNoSql::whereIn('estado', ComandaNoSql::ESTADOS_COCINA)->get();
+
+            if ($activas->isEmpty()) {
+                return;
+            }
+
+            $pedidos = DB::connection('sqlsrv')->table('PEDIDO')
+                ->whereIn('id_pedido', $activas->pluck('id_pedido_sql')->map(fn ($i) => (int) $i)->unique()->values()->all())
+                ->get(['id_pedido', 'token_idempotencia', 'estado', 'fecha_hora'])
+                ->keyBy(fn ($p) => (int) $p->id_pedido);
+
+            foreach ($activas as $comanda) {
+                $pedido = $pedidos->get((int) $comanda->id_pedido_sql);
+
+                if (! $comanda->correspondeA($pedido)) {
+                    Log::warning('Comanda fantasma retirada de cocina', ['comanda' => (string) $comanda->_id, 'pedido' => $comanda->id_pedido_sql]);
+                    $comanda->archivar($pedido ? 'Comanda de otro pedido con el mismo número' : 'El pedido no existe en SQL Server');
+                    continue;
+                }
+
+                if ($pedido->estado !== $comanda->estado && ! in_array($pedido->estado, ComandaNoSql::ESTADOS_COCINA, true)) {
+                    $comanda->estado = $pedido->estado;
+                    $comanda->save();
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('No se pudieron conciliar las comandas con SQL Server', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
      * SQL Server es la fuente de verdad. Si un pedido ABIERTO / EN_PREPARACION no tiene comanda
      * en MongoDB (o la tiene cerrada por una ronda que no llegó), se reconstruye desde sus líneas.
      */
@@ -221,7 +267,7 @@ class ControllerCocina extends Controller
                 $comanda = $comandas->get((int) $p->id_pedido);
 
                 // Comanda al día: no hay nada que recuperar
-                if ($comanda && in_array($comanda->estado, ['ABIERTO', 'EN_PREPARACION'], true)) {
+                if ($comanda && $comanda->correspondeA($p) && in_array($comanda->estado, ComandaNoSql::ESTADOS_COCINA, true)) {
                     continue;
                 }
 
@@ -244,9 +290,10 @@ class ControllerCocina extends Controller
 
     private function recuperarComanda($sql, $p): void
     {
-        $comanda = ComandaNoSql::where('id_pedido_sql', (int) $p->id_pedido)->first();
+        // Solo la comanda de ESTE pedido; una vieja con el mismo número se archiva y se crea una nueva
+        $comanda = ComandaNoSql::delPedido((int) $p->id_pedido, $p);
 
-        if ($comanda && in_array($comanda->estado, ['ABIERTO', 'EN_PREPARACION'], true)) {
+        if ($comanda && in_array($comanda->estado, ComandaNoSql::ESTADOS_COCINA, true)) {
             return;
         }
 

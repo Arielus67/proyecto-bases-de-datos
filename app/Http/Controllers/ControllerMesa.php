@@ -270,7 +270,7 @@ class ControllerMesa extends Controller
 
         // SQL ya quedó confirmado; si MongoDB falla no se revierte
         try {
-            $comanda = ComandaNoSql::where('id_pedido_sql', $idPedido)->first();
+            $comanda = ComandaNoSql::delPedido($idPedido);
 
             if ($comanda) {
                 $comanda->estado = 'ENTREGADO';
@@ -301,7 +301,8 @@ class ControllerMesa extends Controller
 
     private function crearComanda(int $idPedido, array $datos): void
     {
-        if (ComandaNoSql::where('id_pedido_sql', $idPedido)->exists()) {
+        // Si ya hay comanda de ESTE pedido no se duplica; las de otro pedido con el mismo número se archivan
+        if (ComandaNoSql::delPedido($idPedido)) {
             return;
         }
 
@@ -333,7 +334,7 @@ class ControllerMesa extends Controller
     /** Suma una nueva ronda a la comanda: vuelve a ABIERTO y cocina solo ve las líneas nuevas. */
     private function ampliarComanda(int $idPedido, array $lineas): void
     {
-        $comanda = ComandaNoSql::where('id_pedido_sql', $idPedido)->first();
+        $comanda = ComandaNoSql::delPedido($idPedido);
 
         // Sin comanda en MongoDB: cocina la reconstruye desde SQL Server
         if (!$comanda) {

@@ -8,7 +8,8 @@ use App\Support\Sp;
 use Illuminate\Http\Request;
 
 /**
- * Turnos de caja (los abre el administrador; el cajero cierra el suyo desde Caja).
+ * Turnos de caja. El turno del cajero se abre solo al iniciar sesión (App\Support\TurnoAutomatico)
+ * o desde Caja con "Abrir mi turno"; el administrador puede abrirlos o corregirlos desde aquí.
  * Escrituras por sp_turno_caja_insertar / actualizar. Que un cajero no tenga dos
  * turnos abiertos lo garantiza el índice único UQ_TURNO_CAJA_Abierto; que un turno
  * cerrado no se toque, el trigger trg_turno_caja_cerrado.

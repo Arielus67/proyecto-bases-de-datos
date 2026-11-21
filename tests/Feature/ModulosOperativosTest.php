@@ -148,7 +148,7 @@ class ModulosOperativosTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('detalles.0.cantidad');
     }
 
-    public function test_cajero_sin_turno_ve_la_facturacion_y_un_aviso_sin_enlace_para_abrir_turno(): void
+    public function test_cajero_sin_turno_puede_abrirlo_el_mismo_desde_caja(): void
     {
         $this->crearPedidoListo();
         $this->iniciarSesionComo($this->cajero);
@@ -157,7 +157,8 @@ class ModulosOperativosTest extends TestCase
             ->assertOk()
             ->assertSee('Pedidos pendientes de cobro')
             ->assertSee('Mesa 1')
-            ->assertSee('Solicita al administrador')
+            ->assertSee('Abrir mi turno')
+            ->assertSee(route('caja.turno.abrir'), false)
             ->assertDontSee(route('admin.turnos.create'), false);
     }
 

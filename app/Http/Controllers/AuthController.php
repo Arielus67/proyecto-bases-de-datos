@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Middleware\VerificarSesionUnica;
 use App\Support\SesionUnica;
+use App\Support\TurnoAutomatico;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -86,6 +87,14 @@ class AuthController extends Controller
             throw ValidationException::withMessages([
                 'correo' => SesionUnica::mensajeOcupada(),
             ]);
+        }
+
+        // El cajero no depende del administrador: su turno se abre solo al entrar
+        try {
+            TurnoAutomatico::abrirSiFalta($empleado);
+        } catch (\Throwable $e) {
+            Log::error('No se pudo abrir automáticamente el turno de caja', ['empleado' => $empleado->id_empleado, 'error' => $e->getMessage()]);
+            $request->session()->flash('error', 'Iniciaste sesión, pero no se pudo abrir tu turno de caja: ' . $this->mensajeSql($e));
         }
 
         $request->session()->put('bienvenida', true);

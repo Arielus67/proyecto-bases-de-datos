@@ -2226,6 +2226,7 @@ GRANT SELECT (id_empleado, nombre, apellido) ON dbo.EMPLEADO TO rol_cajero
 GRANT SELECT ON dbo.vw_mesas_estado TO rol_cajero
 GRANT SELECT ON dbo.vw_factura_ticket TO rol_cajero
 GRANT UPDATE (fecha_cierre, monto_final) ON dbo.TURNO_CAJA TO rol_cajero
+GRANT EXECUTE ON dbo.sp_turno_caja_insertar TO rol_cajero
 GRANT EXECUTE ON dbo.sp_cobrar_cuenta TO rol_cajero
 GRANT EXECUTE ON dbo.sp_anular_pedido TO rol_cajero
 

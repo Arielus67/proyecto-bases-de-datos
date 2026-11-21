@@ -28,22 +28,24 @@
     --tinta-100: #eef0eb;
     --tinta-50: #f7f6f1;
 
-    --exito-50: #ecf8f0;
-    --exito-200: #b6e3c4;
-    --exito-600: #1d8a4a;
-    --exito-700: #176b3a;
-    --aviso-50: #fff7e8;
-    --aviso-200: #f6d9a1;
-    --aviso-600: #b86e00;
-    --aviso-700: #a15c07;
-    --peligro-50: #fdf0f0;
-    --peligro-200: #f3c2c2;
-    --peligro-600: #c9343f;
-    --peligro-700: #a12731;
-    --info-50: #eef4fd;
-    --info-200: #c2d6f5;
-    --info-600: #2f6fd1;
-    --info-700: #2356a6;
+    /* Estados en tonos tierra que armonizan con el verde bosque, el dorado y la crema:
+       éxito salvia, aviso ocre (familia del dorado), peligro terracota, información azul petróleo */
+    --exito-50: #eef5ef;
+    --exito-200: #c3dec9;
+    --exito-600: #3e7c4f;
+    --exito-700: #2f6140;
+    --aviso-50: #fbf4e6;
+    --aviso-200: #eed7a8;
+    --aviso-600: #b7791f;
+    --aviso-700: #8f5e17;
+    --peligro-50: #fbeeec;
+    --peligro-200: #efc5be;
+    --peligro-600: #b4473a;
+    --peligro-700: #8f3529;
+    --info-50: #edf4f5;
+    --info-200: #c2d9dd;
+    --info-600: #3f6f7a;
+    --info-700: #30565f;
 
     --fondo: var(--tinta-50);
     --superficie: #ffffff;
@@ -113,4 +115,36 @@
 
     --ancho-lateral: 264px;
     --alto-barra: 64px;
+}
+
+/* Tema de la plantilla (MaterialM, "Blue_Theme"): sus variables traían matiz azul en textos,
+   bordes y estados. Se reemplazan por la paleta del restaurante para que todo combine. */
+html[data-color-theme] {
+    --primary: #234c3b;
+    --primary-emphasis: #1b3d2f;
+    --secondary: #c5a56a;
+    --secondary-emphasis: #a98a4f;
+    --lightprimary: rgb(35 76 59 / 12%);
+    --lightsecondary: rgb(197 165 106 / 16%);
+
+    --success: #3e7c4f;
+    --success-emphasis: #2f6140;
+    --lightsuccess: #eef5ef;
+    --warning: #b7791f;
+    --warning-emphasis: #8f5e17;
+    --lightwarning: #fbf4e6;
+    --error: #b4473a;
+    --error-emphasis: #8f3529;
+    --lighterror: #fbeeec;
+    --info: #3f6f7a;
+    --lightinfo: #edf4f5;
+
+    --dark: #1a2b23;
+    --link: #253830;
+    --darklink: #8a948d;
+    --bodytext: #5c665f;
+    --darkgray: #4a5650;
+    --border: #e8e6df;
+    --bordergray: #dedbd2;
+    --lightgray: #f7f6f1;
 }
