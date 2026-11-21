@@ -1,0 +1,187 @@
+[
+  {
+    "usuarios": 5,
+    "segundos": 20,
+    "login_fallidos": 0,
+    "login_promedio_ms": 708,
+    "solicitudes": 3590,
+    "exitosas": 3590,
+    "fallidas": 0,
+    "errores_http": {},
+    "promedio_ms": 28,
+    "p95_ms": 52,
+    "maximo_ms": 553,
+    "rendimiento_rps": 179.5,
+    "cpu_promedio_pct": 84,
+    "cpu_maximo_pct": 87,
+    "memoria_max_mb": 262,
+    "mas_lentas": [
+      {
+        "ruta": "/admin",
+        "promedio_ms": 43,
+        "p95_ms": 68,
+        "n": 102
+      },
+      {
+        "ruta": "/admin/roles",
+        "promedio_ms": 39,
+        "p95_ms": 61,
+        "n": 102
+      },
+      {
+        "ruta": "/admin/facturas",
+        "promedio_ms": 38,
+        "p95_ms": 58,
+        "n": 103
+      }
+    ]
+  },
+  {
+    "usuarios": 10,
+    "segundos": 20,
+    "login_fallidos": 0,
+    "login_promedio_ms": 937,
+    "solicitudes": 3734,
+    "exitosas": 3734,
+    "fallidas": 0,
+    "errores_http": {},
+    "promedio_ms": 54,
+    "p95_ms": 88,
+    "maximo_ms": 726,
+    "rendimiento_rps": 186.7,
+    "cpu_promedio_pct": 88,
+    "cpu_maximo_pct": 91,
+    "memoria_max_mb": 266,
+    "mas_lentas": [
+      {
+        "ruta": "/admin/facturas",
+        "promedio_ms": 76,
+        "p95_ms": 104,
+        "n": 122
+      },
+      {
+        "ruta": "/cocina",
+        "promedio_ms": 74,
+        "p95_ms": 109,
+        "n": 545
+      },
+      {
+        "ruta": "/admin",
+        "promedio_ms": 67,
+        "p95_ms": 97,
+        "n": 122
+      }
+    ]
+  },
+  {
+    "usuarios": 25,
+    "segundos": 20,
+    "login_fallidos": 0,
+    "login_promedio_ms": 1953,
+    "solicitudes": 3854,
+    "exitosas": 3854,
+    "fallidas": 0,
+    "errores_http": {},
+    "promedio_ms": 130,
+    "p95_ms": 166,
+    "maximo_ms": 642,
+    "rendimiento_rps": 192.7,
+    "cpu_promedio_pct": 89,
+    "cpu_maximo_pct": 91,
+    "memoria_max_mb": 266,
+    "mas_lentas": [
+      {
+        "ruta": "/admin",
+        "promedio_ms": 145,
+        "p95_ms": 182,
+        "n": 144
+      },
+      {
+        "ruta": "/admin/pedidos",
+        "promedio_ms": 141,
+        "p95_ms": 184,
+        "n": 140
+      },
+      {
+        "ruta": "/admin/productos",
+        "promedio_ms": 140,
+        "p95_ms": 172,
+        "n": 142
+      }
+    ]
+  },
+  {
+    "usuarios": 50,
+    "segundos": 20,
+    "login_fallidos": 0,
+    "login_promedio_ms": 3579,
+    "solicitudes": 3621,
+    "exitosas": 3621,
+    "fallidas": 0,
+    "errores_http": {},
+    "promedio_ms": 278,
+    "p95_ms": 328,
+    "maximo_ms": 816,
+    "rendimiento_rps": 181.1,
+    "cpu_promedio_pct": 89,
+    "cpu_maximo_pct": 92,
+    "memoria_max_mb": 266,
+    "mas_lentas": [
+      {
+        "ruta": "/admin",
+        "promedio_ms": 298,
+        "p95_ms": 380,
+        "n": 140
+      },
+      {
+        "ruta": "/admin/productos",
+        "promedio_ms": 293,
+        "p95_ms": 339,
+        "n": 138
+      },
+      {
+        "ruta": "/admin/pedidos",
+        "promedio_ms": 293,
+        "p95_ms": 334,
+        "n": 136
+      }
+    ]
+  },
+  {
+    "usuarios": 100,
+    "segundos": 20,
+    "login_fallidos": 0,
+    "login_promedio_ms": 6828,
+    "solicitudes": 3849,
+    "exitosas": 3849,
+    "fallidas": 0,
+    "errores_http": {},
+    "promedio_ms": 528,
+    "p95_ms": 632,
+    "maximo_ms": 1072,
+    "rendimiento_rps": 192.4,
+    "cpu_promedio_pct": 88,
+    "cpu_maximo_pct": 92,
+    "memoria_max_mb": 266,
+    "mas_lentas": [
+      {
+        "ruta": "/admin",
+        "promedio_ms": 550,
+        "p95_ms": 682,
+        "n": 157
+      },
+      {
+        "ruta": "/admin/pedidos",
+        "promedio_ms": 550,
+        "p95_ms": 631,
+        "n": 140
+      },
+      {
+        "ruta": "/admin/roles",
+        "promedio_ms": 536,
+        "p95_ms": 635,
+        "n": 160
+      }
+    ]
+  }
+]

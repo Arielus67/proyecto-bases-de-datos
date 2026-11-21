@@ -24,4 +24,9 @@ class ComandaNoSql extends Model
     protected $casts = [
         'ronda_at' => 'datetime',
     ];
+
+    public static function llaveBloqueo(int $idPedido): string
+    {
+        return 'comanda-mongo-' . $idPedido;
+    }
 }

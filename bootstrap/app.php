@@ -11,7 +11,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        $middleware->alias([
+            'rol.sql' => \App\Http\Middleware\AplicarRolSql::class,
+        ]);
+
+        $middleware->web(append: [
+            \App\Http\Middleware\IdentificarUsuarioSql::class,
+            \App\Http\Middleware\VerificarSesionUnica::class,
+        ]);
+
+        $middleware->encryptCookies(except: ['menu_contraido']);
+
+        $middleware->redirectGuestsTo(fn () => route('login'));
+        $middleware->redirectUsersTo(fn () => route('inicio'));
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

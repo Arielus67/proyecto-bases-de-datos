@@ -19,7 +19,7 @@ class FacturaController extends Controller
             ->orderByDesc('fecha_hora')
             ->paginate(15);
 
-        return view('modules.admin.facturas.index', compact('items'));
+        return view('admin.facturas.index', compact('items'));
     }
 
     // ---------- Detalle de la factura con sus pagos ----------
@@ -27,7 +27,7 @@ class FacturaController extends Controller
     {
         $item = Factura::with(['cliente', 'cajero', 'pagos.metodo', 'anuladaPor'])->findOrFail($id);
 
-        return view('modules.admin.facturas.show', compact('item'));
+        return view('admin.facturas.show', compact('item'));
     }
 
     // ---------- Anular factura (solo si está cobrada; exige motivo y queda registrado quién y cuándo) ----------
@@ -45,16 +45,27 @@ class FacturaController extends Controller
 
         // El WHERE estado = 'COBRADA' evita anularla dos veces si dos personas lo intentan a la vez
         // auth()->id() debe ser el id_empleado de quien anula (columna anulada_por, FK a EMPLEADO)
-        $filas = Factura::where('id_factura', $factura->id_factura)
-            ->where('estado', 'COBRADA')
-            ->update([
+        $anulada = DB::connection('sqlsrv')->transaction(function () use ($factura, $datos) {
+            $cobrada = Factura::where('id_factura', $factura->id_factura)
+                ->where('estado', 'COBRADA')
+                ->lockForUpdate()
+                ->exists();
+
+            if (! $cobrada) {
+                return false;
+            }
+
+            Factura::where('id_factura', $factura->id_factura)->update([
                 'estado'           => 'ANULADA',
                 'motivo_anulacion' => $datos['motivo_anulacion'],
                 'anulada_por'      => auth()->id(),
                 'fecha_anulacion'  => DB::raw('GETDATE()'),
             ]);
 
-        if ($filas === 0) {
+            return true;
+        });
+
+        if (! $anulada) {
             return back()->with('error', 'Esta factura ya está anulada.');
         }
 

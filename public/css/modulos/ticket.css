@@ -1,0 +1,519 @@
+@page ticket80 {
+    size: 80mm auto;
+    margin: 0;
+}
+
+@page ticket58 {
+    size: 58mm auto;
+    margin: 0;
+}
+
+.ticket-pagina {
+    --ancho-ticket: 80mm;
+    --fuente-ticket: 12px;
+    --impresora-cuerpo: #2b2b2b;
+    --impresora-pantalla: #1c1c1c;
+    --impresora-texto: #f2f2f2;
+    --impresora-suave: #a9a9a9;
+    --papel: #fbfbf9;
+    min-height: 100vh;
+    background:
+        radial-gradient(70% 45% at 50% 0%, rgb(255 255 255 / 70%), transparent 70%),
+        #e9e8e5;
+}
+
+.ticket-58 {
+    --ancho-ticket: 58mm;
+    --fuente-ticket: 10px;
+}
+
+.impresion {
+    display: flex;
+    justify-content: center;
+    padding: var(--esp-10) var(--esp-4) var(--esp-12);
+}
+
+.impresora {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: min(440px, 100%);
+}
+
+.impresora__cuerpo {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    padding: var(--esp-4) var(--esp-4) 22px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, #333333, var(--impresora-cuerpo) 30%);
+    box-shadow:
+        0 22px 40px -24px rgb(0 0 0 / 55%),
+        0 2px 0 rgb(255 255 255 / 6%) inset,
+        0 -2px 0 rgb(0 0 0 / 35%) inset;
+    color: var(--impresora-texto);
+    animation: aparecer-escala var(--duracion-lenta) var(--curva) both;
+}
+
+.impresora__barra {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--esp-3);
+    margin-bottom: var(--esp-3);
+}
+
+.impresora__logo {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+    background: #5c5c5c;
+    color: #2b2b2b;
+}
+
+.impresora__logo svg {
+    width: 20px;
+    height: 20px;
+}
+
+.impresora__botones {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.pildora {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 10px;
+    background: #4a4a4a;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 10%) inset, 0 2px 4px rgb(0 0 0 / 30%);
+    color: var(--impresora-texto);
+    font-size: var(--texto-sm);
+    font-weight: 600;
+    transition: background-color var(--duracion-rapida) var(--curva), transform var(--duracion-rapida) var(--curva);
+}
+
+.pildora:hover {
+    background: #5a5a5a;
+    color: #fff;
+}
+
+.pildora:active {
+    transform: translateY(1px);
+}
+
+.pildora .ti {
+    font-size: 16px;
+}
+
+.impresora__pantalla {
+    padding: var(--esp-4) var(--esp-5);
+    border-radius: 14px;
+    background: var(--impresora-pantalla);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 50%) inset;
+}
+
+.impresora__resumen {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--esp-4);
+}
+
+.impresora__titulo {
+    color: var(--impresora-texto);
+    font-family: var(--fuente-titulo);
+    font-size: var(--texto-md);
+    font-weight: 700;
+}
+
+.impresora__detalle {
+    margin-top: 2px;
+    color: var(--impresora-suave);
+    font-size: var(--texto-sm);
+}
+
+.impresora__total {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+}
+
+.impresora__total span {
+    color: var(--impresora-suave);
+    font-size: var(--texto-xs);
+}
+
+.impresora__total strong {
+    color: var(--impresora-texto);
+    font-size: var(--texto-lg);
+    white-space: nowrap;
+}
+
+.impresora__estado {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: var(--esp-4);
+    color: var(--impresora-texto);
+    font-size: var(--texto-sm);
+    font-weight: 500;
+}
+
+#impresora-estado {
+    animation: estado-texto 260ms var(--curva) both;
+}
+
+.impresora__indicador {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+}
+
+.impresora__giro {
+    width: 15px;
+    height: 15px;
+    border: 2px solid rgb(255 255 255 / 25%);
+    border-top-color: var(--impresora-texto);
+    border-radius: 50%;
+    animation: girar 0.8s linear infinite;
+}
+
+.impresora__check {
+    position: absolute;
+    inset: 0;
+    width: 18px;
+    height: 18px;
+    opacity: 0;
+    transform: scale(0.4);
+}
+
+.impresora__check circle {
+    fill: #34a853;
+}
+
+.impresora__check path {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 14;
+    stroke-dashoffset: 14;
+}
+
+.impresora[data-fase="completo"] .impresora__giro,
+.impresora[data-fase="reimpresion"] .impresora__giro {
+    display: none;
+}
+
+.impresora[data-fase="completo"] .impresora__check,
+.impresora[data-fase="reimpresion"] .impresora__check {
+    opacity: 1;
+    transform: none;
+}
+
+.impresora[data-fase="completo"] .impresora__check {
+    animation: check-aparece 380ms var(--curva-rebote) both;
+}
+
+.impresora[data-fase="completo"] .impresora__check path {
+    animation: check-trazo 360ms var(--curva) 160ms forwards;
+}
+
+.impresora[data-fase="reimpresion"] .impresora__check path {
+    stroke-dashoffset: 0;
+}
+
+.impresora__ranura {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 9px;
+    height: 7px;
+    border-radius: 4px;
+    background: #121212;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 8%), 0 1px 3px rgb(0 0 0 / 80%) inset;
+}
+
+.impresora__salida {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: -14px;
+    padding: 0 var(--esp-4) var(--esp-8);
+    overflow: hidden;
+}
+
+.ticket {
+    width: var(--ancho-ticket);
+    max-width: 100%;
+    padding: 9mm 5mm 8mm;
+    background:
+        linear-gradient(180deg, rgb(0 0 0 / 14%), transparent 18px),
+        var(--papel);
+    box-shadow: 0 16px 26px -16px rgb(0 0 0 / 30%), 0 0 0 1px rgb(0 0 0 / 4%);
+    color: #1d1d1d;
+    font-family: var(--fuente-mono), 'Courier New', monospace;
+    font-size: var(--fuente-ticket);
+    line-height: 1.45;
+    -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 9px 100%;
+    mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 9px 100%;
+}
+
+.ticket__logo {
+    display: grid;
+    place-items: center;
+    width: 13mm;
+    height: 13mm;
+    margin: 0 auto;
+    background: #1d1d1d;
+    color: var(--papel);
+}
+
+.ticket__logo svg {
+    width: 62%;
+    height: 62%;
+}
+
+.ticket__nombre {
+    margin-top: 2.5mm;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-align: center;
+}
+
+.ticket__linea {
+    margin: 4mm 0;
+    border-top: 1px dashed #9a9a9a;
+}
+
+.ticket__fila {
+    display: flex;
+    justify-content: space-between;
+    gap: 3mm;
+}
+
+.ticket__fila span:last-child {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.ticket__fila--fuerte {
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.ticket__fila--fuerte span:first-child {
+    word-break: break-word;
+}
+
+.ticket__fila--suave,
+.ticket__suave {
+    color: #5e5e5e;
+}
+
+.ticket__producto + .ticket__producto {
+    margin-top: 2.5mm;
+}
+
+.ticket__nota {
+    padding-left: 3mm;
+    color: #3a3a3a;
+    font-style: italic;
+}
+
+.ticket__total {
+    margin-top: 3mm;
+    align-items: baseline;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.ticket__total span:last-child {
+    font-size: 1.45em;
+    letter-spacing: 0;
+}
+
+.ticket__datos {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1mm 4mm;
+    margin: 0;
+    color: #5e5e5e;
+}
+
+.ticket__datos dt {
+    font-weight: 400;
+}
+
+.ticket__datos dd {
+    margin: 0;
+    color: #1d1d1d;
+    text-align: right;
+    word-break: break-word;
+}
+
+.ticket__codigo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1mm;
+    margin-top: 6mm;
+    color: #5e5e5e;
+    font-size: 0.85em;
+    letter-spacing: 0.2em;
+}
+
+.ticket__codigo svg {
+    max-width: 100%;
+    height: 46px;
+    fill: #111;
+}
+
+.ticket__gracias {
+    margin-top: 4mm;
+    text-align: center;
+}
+
+.impresora[data-fase="preparando"] .ticket {
+    transform: translateY(-101%);
+}
+
+.impresora[data-fase="imprimiendo"] .ticket {
+    animation: salida-papel var(--duracion-impresion, 1900ms) cubic-bezier(0.32, 0.5, 0.24, 1) both;
+}
+
+.impresora[data-fase="imprimiendo"] .impresora__cuerpo {
+    animation: vibracion 90ms linear infinite;
+}
+
+.impresora[data-fase="completo"] .impresora__cuerpo,
+.impresora[data-fase="reimpresion"] .impresora__cuerpo {
+    animation: none;
+}
+
+.impresora[data-fase="reimpresion"] .ticket {
+    animation: salida-papel 700ms var(--curva) both;
+}
+
+@keyframes salida-papel {
+    from { transform: translateY(-101%); }
+    to { transform: translateY(0); }
+}
+
+@keyframes vibracion {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(0.6px); }
+}
+
+@keyframes check-aparece {
+    from { opacity: 0; transform: scale(0.4); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes check-trazo {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes estado-texto {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 480px) {
+    .impresion {
+        padding-top: var(--esp-5);
+    }
+
+    .impresora__barra {
+        align-items: flex-start;
+    }
+
+    .pildora {
+        padding: 0 10px;
+        font-size: var(--texto-xs);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .impresora .ticket,
+    .impresora__cuerpo,
+    .impresora__check,
+    .impresora__check path,
+    #impresora-estado {
+        animation: none !important;
+    }
+
+    .impresora[data-fase] .ticket {
+        transform: none;
+    }
+
+    .impresora__check path {
+        stroke-dashoffset: 0;
+    }
+}
+
+@media print {
+    .ticket-80 .ticket { page: ticket80; }
+    .ticket-58 .ticket { page: ticket58; }
+
+    .ticket-pagina {
+        min-height: 0;
+        background: #fff;
+    }
+
+    .impresora__cuerpo,
+    .notificaciones {
+        display: none !important;
+    }
+
+    .impresion,
+    .impresora,
+    .impresora__salida {
+        display: block;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: visible;
+    }
+
+    .ticket {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 3mm 2mm 4mm;
+        background: #fff;
+        box-shadow: none;
+        color: #000;
+        -webkit-mask: none;
+        mask: none;
+        animation: none !important;
+        transform: none !important;
+    }
+
+    .ticket__fila--suave,
+    .ticket__suave,
+    .ticket__datos,
+    .ticket__codigo {
+        color: #000;
+    }
+
+    .ticket__linea {
+        border-top-color: #000;
+    }
+}

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es" dir="ltr" data-color-theme="Blue_Theme" data-layout="vertical" data-card="shadow" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{{ config('app.name') }} - @yield('titulo', 'Inicio')</title>
+
+    <link rel="shortcut icon" href="{{ asset('img/marca/favicon.png') }}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+    <link rel="stylesheet" href="{{ asset('src/assets/css/theme.css') }}">
+
+    @stack('css')
+</head>
+
+<body class="DEFAULT_THEME bg-white min-h-screen">
+
+    <main class="min-h-screen">
+        <div id="main-wrapper" class="flex min-h-screen w-full">
+
+            {{-- MENÚ LATERAL --}}
+            @include('layouts.menu')
+
+            {{-- CONTENIDO PRINCIPAL --}}
+            <div class="page-wrapper flex-1 min-w-0 flex flex-col justify-between" style="margin-left: 0 !important; padding-left: 0 !important;">
+
+                <div>
+                    {{-- BARRA SUPERIOR --}}
+                    <header class="sticky top-0 z-10 bg-white">
+                        <div class="flex items-center justify-between p-4 px-6">
+                            <div>
+                                <h2 class="text-lg font-semibold">{{ config('app.name') }}</h2>
+                                <p class="text-sm text-gray-500">Administración del restaurante</p>
+                            </div>
+                            @include('layouts.sesion', ['etiqueta' => 'Panel administrativo'])
+                        </div>
+                    </header>
+
+                    {{-- CONTENEDOR GENERAL --}}
+                    <div class="w-full pt-6 px-6">
+                        <div class="w-full">
+
+                            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                                <div>
+                                    <h1 class="text-2xl font-semibold">
+                                        @yield('titulo', 'Título general')
+                                    </h1>
+                                </div>
+
+                                <div>
+                                    @yield('botones')
+                                </div>
+                            </div>
+
+                            <div class="w-full max-w-none">
+                                @yield('contenido')
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                {{-- FOOTER --}}
+                <footer class="p-5 px-6 text-sm text-gray-500 border-t border-gray-100">
+                    © {{ date('Y') }} {{ config('app.name') }}
+                </footer>
+
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ asset('src/assets/js/theme/app.init.js') }}"></script>
+    <script src="{{ asset('src/assets/js/theme/app.min.js') }}"></script>
+    <script src="{{ asset('src/assets/js/theme.js') }}"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/preline@3.0.1/dist/preline.js"></script>
+
+    @include('layouts.js')
+    <script src="{{ asset('js/sondeo.js') }}"></script>
+    @stack('scripts')
+
+</body>
+
+</html>

@@ -1,0 +1,38 @@
+[
+  {
+    "prueba": "Preparación: sesión de administrador",
+    "esperado": "200",
+    "obtenido": "200",
+    "ok": true
+  },
+  {
+    "prueba": "Base de datos no disponible: la petición falla de forma controlada",
+    "esperado": "500 sin detalles internos",
+    "obtenido": "500 en 10 ms, muestra ruta/SQL: no",
+    "ok": true
+  },
+  {
+    "prueba": "Base de datos no disponible: se recupera sola al volver",
+    "esperado": "200",
+    "obtenido": "200 en 17 ms",
+    "ok": true
+  },
+  {
+    "prueba": "Base de datos bloqueada 6 s por otro proceso (equivale a una consulta lenta)",
+    "esperado": "espera y termina sin error ni datos a medias",
+    "obtenido": "302 en 5563 ms; rol creado=1",
+    "ok": true
+  },
+  {
+    "prueba": "Caída abrupta de Laravel (kill -9) mientras se crean roles",
+    "esperado": "integridad ok y ningún rol a medias",
+    "obtenido": "creados antes de caer=71, peticiones fallidas tras caer=329, integrity_check=ok, roles sin permisos=0",
+    "ok": true
+  },
+  {
+    "prueba": "Reinicio del servidor: el sistema vuelve a operar",
+    "esperado": "302 y rol creado",
+    "obtenido": "302; rol=1",
+    "ok": true
+  }
+]

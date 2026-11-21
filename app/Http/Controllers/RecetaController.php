@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Insumo;
 use App\Models\Producto;
+use App\Support\Sp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Recetas (tabla RECETA, relación N:M entre PRODUCTO e INSUMO, clave compuesta).
- * Se gestiona una receta completa por producto: el parámetro {receta} de las rutas es el id_producto.
+ * Se maneja la receta completa de un producto: el parámetro {receta} de las rutas es el id_producto.
+ * Escrituras por sp_receta_insertar / sp_receta_eliminar dentro de una sola transacción.
  */
 class RecetaController extends Controller
 {
@@ -21,58 +23,62 @@ class RecetaController extends Controller
             ->orderBy('nombre_producto')
             ->paginate(15);
 
-        return view('modules.admin.recetas.index', compact('items'));
+        return view('admin.recetas.index', compact('items'));
     }
 
-    // ---------- Formulario de creación (solo productos sin receta) ----------
+    // ---------- Crear (solo productos sin receta) ----------
     public function create()
     {
         $productos = Producto::doesntHave('recetas')->orderBy('nombre_producto')->pluck('nombre_producto', 'id_producto');
 
-        return view('modules.admin.recetas.form', ['item' => null, 'productos' => $productos, 'insumos' => $this->insumos()]);
+        return view('admin.recetas.form', ['item' => null, 'productos' => $productos, 'insumos' => $this->insumos()]);
     }
 
-    // ---------- Guardar nueva receta ----------
     public function store(Request $request)
     {
         $datos = $request->validate([
             'id_producto' => ['required', 'integer', 'exists:PRODUCTO,id_producto'],
-        ] + $this->reglasLineas());
+        ] + $this->reglasLineas($request));
 
         if (DB::table('RECETA')->where('id_producto', $datos['id_producto'])->exists()) {
             return back()->withInput()->with('error', 'Ese producto ya tiene receta. Edítala desde el listado.');
         }
 
-        $this->guardarLineas($datos['id_producto'], $datos['insumos'], $datos['cantidades']);
-
-        return redirect()->route('admin.recetas.index')->with('success', 'Receta creada correctamente.');
+        return $this->intentar(
+            fn () => $this->guardarLineas((int) $datos['id_producto'], $datos['insumos'], $datos['cantidades']),
+            'Receta creada correctamente.',
+            'admin.recetas.index'
+        );
     }
 
-    // ---------- Formulario de edición ----------
     public function edit($id)
     {
         $item = Producto::with('recetas')->findOrFail($id);
 
-        return view('modules.admin.recetas.form', ['item' => $item, 'productos' => [], 'insumos' => $this->insumos()]);
+        return view('admin.recetas.form', ['item' => $item, 'productos' => [], 'insumos' => $this->insumos()]);
     }
 
-    // ---------- Actualizar (se reemplazan todas las líneas) ----------
+    // ---------- Actualizar: se reemplazan todas las líneas ----------
     public function update(Request $request, $id)
     {
         $producto = Producto::findOrFail($id);
-        $datos = $request->validate($this->reglasLineas());
+        $datos = $request->validate($this->reglasLineas($request));
 
-        $this->guardarLineas($producto->id_producto, $datos['insumos'], $datos['cantidades']);
-
-        return redirect()->route('admin.recetas.index')->with('success', 'Receta actualizada correctamente.');
+        return $this->intentar(
+            fn () => $this->guardarLineas((int) $producto->id_producto, $datos['insumos'], $datos['cantidades']),
+            'Receta actualizada correctamente.',
+            'admin.recetas.index'
+        );
     }
 
     // ---------- Eliminar la receta completa del producto ----------
     public function destroy($id)
     {
-        DB::table('RECETA')->where('id_producto', $id)->delete();
-
-        return redirect()->route('admin.recetas.index')->with('success', 'Receta eliminada correctamente.');
+        return $this->intentar(
+            fn () => Sp::ejecutar('sp_receta_eliminar', ['id_producto' => (int) $id]),
+            'Receta eliminada correctamente.',
+            'admin.recetas.index'
+        );
     }
 
     // ---------- Insumos para el select: id => "nombre (unidad)" ----------
@@ -83,32 +89,32 @@ class RecetaController extends Controller
     }
 
     // ---------- Reglas de las líneas dinámicas (insumos[] y cantidades[]) ----------
-    private function reglasLineas(): array
+    private function reglasLineas(Request $request): array
     {
         return [
             'insumos'      => ['required', 'array', 'min:1'],
             'insumos.*'    => ['required', 'integer', 'distinct', 'exists:INSUMO,id_insumo'],
-            'cantidades'   => ['required', 'array'],
-            'cantidades.*' => ['required', 'numeric', 'min:0.01'],
+            'cantidades'   => ['required', 'array', 'size:' . count((array) $request->input('insumos', []))],
+            'cantidades.*' => ['required', 'numeric', 'decimal:0,2', 'max:99999999.99', 'min:0.01'],
         ];
     }
 
-    // ---------- Reemplaza las líneas de RECETA de un producto ----------
-    private function guardarLineas($idProducto, array $insumos, array $cantidades): void
+    // ---------- Borra la receta anterior e inserta la nueva, todo o nada ----------
+    private function guardarLineas(int $idProducto, array $insumos, array $cantidades): void
     {
+        $insumos = array_values($insumos);
+        $cantidades = array_values($cantidades);
+
         DB::transaction(function () use ($idProducto, $insumos, $cantidades) {
-            DB::table('RECETA')->where('id_producto', $idProducto)->delete();
+            Sp::ejecutar('sp_receta_eliminar', ['id_producto' => $idProducto]);
 
-            $filas = [];
             foreach ($insumos as $i => $idInsumo) {
-                $filas[] = [
+                Sp::ejecutar('sp_receta_insertar', [
                     'id_producto' => $idProducto,
-                    'id_insumo'   => $idInsumo,
+                    'id_insumo'   => (int) $idInsumo,
                     'cantidad'    => $cantidades[$i],
-                ];
+                ]);
             }
-
-            DB::table('RECETA')->insert($filas);
         });
     }
 }

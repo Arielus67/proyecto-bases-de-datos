@@ -14,7 +14,7 @@ class AlertaStockController extends Controller
             ->orderByDesc('fecha_hora')
             ->paginate(15);
 
-        return view('modules.admin.alertas.index', compact('items'));
+        return view('admin.alertas.index', compact('items'));
     }
 
     // ---------- Marcar una alerta como atendida ----------

@@ -1,0 +1,59 @@
+.permisos-rol {
+    grid-column: 1 / -1;
+}
+
+.permisos-rol__cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.permisos-rol__lista {
+    border: 1px solid var(--borde, #e5e5e5);
+    border-radius: var(--radio-md, 10px);
+    overflow: hidden;
+}
+
+.permisos-rol__modulo {
+    display: grid;
+    grid-template-columns: minmax(160px, 220px) 1fr;
+    gap: 10px 16px;
+    margin: 0;
+    padding: 12px 16px;
+    border: 0;
+}
+
+.permisos-rol__modulo + .permisos-rol__modulo {
+    border-top: 1px solid var(--borde-suave, #efefef);
+}
+
+.permisos-rol__opciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+}
+
+.permisos-rol__casilla {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.permisos-rol__casilla--modulo {
+    font-weight: 600;
+}
+
+.permisos-rol__casilla--suave {
+    color: var(--texto-tenue, #8a8a8a);
+}
+
+@media (max-width: 640px) {
+    .permisos-rol__modulo {
+        grid-template-columns: 1fr;
+    }
+}

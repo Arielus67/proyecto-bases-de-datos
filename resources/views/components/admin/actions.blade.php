@@ -1,20 +1,15 @@
-{{-- COMPONENTE: botones de acción por fila (ver / editar / eliminar)
-     Se puede añadir contenido extra por el slot (ej. botón "Atender"). --}}
 @props(['show' => null, 'edit' => null, 'destroy' => null])
 
 <div class="flex items-center gap-2">
-    {{-- Ver detalle --}}
-    @if ($show)
+    @if (\App\Support\Acceso::permite($show))
         <a href="{{ $show }}" title="Ver" class="text-gray-500 hover:text-primary"><i class="ti ti-eye text-lg"></i></a>
     @endif
 
-    {{-- Editar --}}
-    @if ($edit)
+    @if (\App\Support\Acceso::permite($edit))
         <a href="{{ $edit }}" title="Editar" class="text-gray-500 hover:text-primary"><i class="ti ti-pencil text-lg"></i></a>
     @endif
 
-    {{-- Eliminar (pide confirmación mediante layouts/js.blade.php) --}}
-    @if ($destroy)
+    @if (\App\Support\Acceso::permite($destroy, 'DELETE'))
         <form method="POST" action="{{ $destroy }}" data-confirm="¿Seguro que deseas eliminar este registro?">
             @csrf
             @method('DELETE')
@@ -22,6 +17,5 @@
         </form>
     @endif
 
-    {{-- Acciones extra --}}
     {{ $slot }}
 </div>

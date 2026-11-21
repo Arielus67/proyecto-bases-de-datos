@@ -18,6 +18,6 @@ class PagoController extends Controller
 
         $metodos = MetodoPago::orderBy('nombre_metodo')->pluck('nombre_metodo', 'id_metodo_pago');
 
-        return view('modules.admin.pagos.index', compact('items', 'metodos'));
+        return view('admin.pagos.index', compact('items', 'metodos'));
     }
 }

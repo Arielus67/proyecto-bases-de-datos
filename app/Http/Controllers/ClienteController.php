@@ -3,92 +3,67 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cliente;
-use App\Support\CedulaCipher;
-use Illuminate\Database\QueryException;
+use App\Support\Sp;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
+/**
+ * Clientes para facturación. Escrituras por sp_cliente_insertar / actualizar / eliminar.
+ */
 class ClienteController extends Controller
 {
-    // ---------- Listado (la cédula se muestra enmascarada) ----------
     public function index()
     {
         $items = Cliente::orderBy('apellido')->orderBy('nombre')->paginate(15);
 
-        $items->getCollection()->each(function ($cliente) {
-            $cliente->cedula_mask = CedulaCipher::enmascarar($cliente->cedula);
-        });
-
-        return view('modules.admin.clientes.index', compact('items'));
+        return view('admin.clientes.index', compact('items'));
     }
 
-    // ---------- Formulario de creación ----------
     public function create()
     {
-        return view('modules.admin.clientes.form', ['item' => null]);
+        return view('admin.clientes.form', ['item' => null]);
     }
 
-    // ---------- Guardar nuevo (la cédula se cifra antes de insertar) ----------
     public function store(Request $request)
     {
-        $datos = $this->validar($request, true);
+        $datos = $this->validar($request);
 
-        DB::table('CLIENTE')->insert([
-            'cedula'   => CedulaCipher::paraSql($datos['cedula']),
-            'nombre'   => $datos['nombre'],
-            'apellido' => $datos['apellido'],
-            'telefono' => $datos['telefono'] ?? null,
-            'correo'   => $datos['correo'] ?? null,
-        ]);
-
-        return redirect()->route('admin.clientes.index')->with('success', 'Cliente creado correctamente.');
+        return $this->intentar(
+            fn () => Sp::insertar('sp_cliente_insertar', $datos, 'id_cliente'),
+            'Cliente creado correctamente.',
+            'admin.clientes.index'
+        );
     }
 
-    // ---------- Formulario de edición ----------
     public function edit($id)
     {
-        return view('modules.admin.clientes.form', ['item' => Cliente::findOrFail($id)]);
+        return view('admin.clientes.form', ['item' => Cliente::findOrFail($id)]);
     }
 
-    // ---------- Actualizar (si la cédula viene vacía se conserva la actual) ----------
     public function update(Request $request, $id)
     {
-        Cliente::findOrFail($id);
-        $datos = $this->validar($request, false);
+        $datos = ['id_cliente' => (int) $id] + $this->validar($request, $id);
 
-        $cambios = [
-            'nombre'   => $datos['nombre'],
-            'apellido' => $datos['apellido'],
-            'telefono' => $datos['telefono'] ?? null,
-            'correo'   => $datos['correo'] ?? null,
-        ];
-
-        if (! empty($datos['cedula'])) {
-            $cambios['cedula'] = CedulaCipher::paraSql($datos['cedula']);
-        }
-
-        DB::table('CLIENTE')->where('id_cliente', $id)->update($cambios);
-
-        return redirect()->route('admin.clientes.index')->with('success', 'Cliente actualizado correctamente.');
+        return $this->intentar(
+            fn () => Sp::ejecutar('sp_cliente_actualizar', $datos),
+            'Cliente actualizado correctamente.',
+            'admin.clientes.index'
+        );
     }
 
-    // ---------- Eliminar ----------
     public function destroy($id)
     {
-        try {
-            Cliente::findOrFail($id)->delete();
-        } catch (QueryException $e) {
-            return back()->with('error', 'No se puede eliminar: el cliente tiene facturas asociadas.');
-        }
-
-        return redirect()->route('admin.clientes.index')->with('success', 'Cliente eliminado correctamente.');
+        return $this->intentar(
+            fn () => Sp::ejecutar('sp_cliente_eliminar', ['id_cliente' => (int) $id]),
+            'Cliente eliminado correctamente.',
+            'admin.clientes.index'
+        );
     }
 
-    // ---------- Validación (la cédula solo es obligatoria al crear) ----------
-    private function validar(Request $request, bool $creando): array
+    private function validar(Request $request, $id = null): array
     {
         return $request->validate([
-            'cedula'   => [$creando ? 'required' : 'nullable', 'string', 'max:20'],
+            'cedula'   => ['required', 'string', 'max:20', Rule::unique('CLIENTE', 'cedula')->ignore($id, 'id_cliente')],
             'nombre'   => ['required', 'string', 'max:50'],
             'apellido' => ['required', 'string', 'max:50'],
             'telefono' => ['nullable', 'string', 'max:20'],

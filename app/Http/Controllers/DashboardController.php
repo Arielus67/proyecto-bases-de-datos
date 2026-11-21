@@ -32,15 +32,12 @@ class DashboardController extends Controller
             ->limit(8)
             ->get();
 
-        // Bloques nuevos de la matriz. Cada uno se ejecuta dentro de bloqueSeguro():
-        // si uno falla (por ejemplo, una relación que aún no existe), el resto del
-        // dashboard sigue cargando y ese bloque muestra su estado vacío.
         $ventasPorDia = $this->bloqueSeguro('ganancias por día', fn () => $this->ventasUltimosDias(7));
         $alertasStock = $this->bloqueSeguro('alertas de stock',  fn () => $this->alertasPendientes(5));
         $mesas        = $this->bloqueSeguro('estado de mesas',   fn () => $this->estadoDeMesas());
         $topProductos = $this->bloqueSeguro('productos más vendidos', fn () => $this->productosMasVendidos(5, 30));
 
-        return view('modules.admin.dashboard', compact(
+        return view('admin.dashboard.index', compact(
             'stats',
             'ultimosPedidos',
             'ventasPorDia',
@@ -59,30 +56,10 @@ class DashboardController extends Controller
             return $consulta();
         } catch (\Throwable $error) {
             report($error);
-            Log::warning("Dashboard: no se pudo cargar el bloque '{$nombre}'. Revisa los SUPUESTOS de su método.");
+            Log::warning("Dashboard: no se pudo cargar el bloque '{$nombre}'.");
 
             return [];
         }
-    }
-
-    // ---------- Ayudante: primer campo que exista y tenga valor ----------
-    // Recorre la lista de columnas candidatas y devuelve la primera que no esté vacía.
-    // Sirve cuando no estamos seguros de cómo se llama la columna del nombre.
-    private function primerCampo($modelo, array $candidatos, $porDefecto = null)
-    {
-        if (! $modelo) {
-            return $porDefecto;
-        }
-
-        foreach ($candidatos as $campo) {
-            $valor = $modelo->getAttribute($campo);
-
-            if ($valor !== null && $valor !== '') {
-                return $valor;
-            }
-        }
-
-        return $porDefecto;
     }
 
     // ---------- Gráfico: total cobrado por día ----------
@@ -114,8 +91,6 @@ class DashboardController extends Controller
     }
 
     // ---------- Alertas de stock sin atender ----------
-    // SUPUESTO: AlertaStock tiene la relación "insumo" con los campos
-    // nombre, stock_actual, stock_minimo y unidad_medida. Ajusta los nombres si difieren.
     private function alertasPendientes(int $limite): array
     {
         return AlertaStock::with('insumo')
@@ -128,7 +103,7 @@ class DashboardController extends Controller
                 $minimo = (float) ($insumo->stock_minimo ?? 0);
 
                 return [
-                    'nombre'   => $this->primerCampo($insumo, ['nombre', 'nombre_insumo', 'descripcion'], 'Insumo sin nombre'),
+                    'nombre'   => $insumo->nombre_insumo ?? 'Insumo sin nombre',
                     'cantidad' => $actual,
                     'unidad'   => $insumo->unidad_medida ?? '',
                     // Crítico si queda la mitad (o menos) del mínimo; si no, "bajo"
@@ -151,9 +126,6 @@ class DashboardController extends Controller
             ->all();
     }
 
-    // ---------- Ranking de productos ----------
-    // SUPUESTO: existe el modelo DetallePedido con id_producto y cantidad, y las
-    // relaciones "pedido" y "producto" (con el campo nombre).
     private function productosMasVendidos(int $limite, int $dias): array
     {
         return DetallePedido::select('id_producto', DB::raw('SUM(cantidad) as total_vendido'))
@@ -167,7 +139,7 @@ class DashboardController extends Controller
             ->limit($limite)
             ->get()
             ->map(fn ($detalle) => [
-                'nombre'   => $this->primerCampo($detalle->producto, ['nombre', 'nombre_producto', 'descripcion'], 'Producto'),
+                'nombre'   => $detalle->producto->nombre_producto ?? 'Producto',
                 'cantidad' => (int) $detalle->total_vendido,
             ])
             ->all();

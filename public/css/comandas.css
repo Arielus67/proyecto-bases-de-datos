@@ -489,3 +489,103 @@
     font-weight: 600;
     color: #2563eb;
 }
+
+.menu-herramientas {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.menu-busqueda {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #f9fafb;
+}
+
+.menu-busqueda i {
+    color: #6b7280;
+    font-size: 18px;
+}
+
+.menu-busqueda input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 0;
+    border: 0;
+    background: transparent;
+    font-size: 14px;
+    outline: none;
+}
+
+.menu-busqueda:focus-within {
+    border-color: #2563eb;
+    background: #fff;
+}
+
+.menu-categorias {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.menu-chip {
+    padding: 6px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color .2s ease, border-color .2s ease, color .2s ease;
+}
+
+.menu-chip:hover {
+    background: #eff6ff;
+    border-color: #2563eb;
+}
+
+.menu-chip.activa {
+    background: #111827;
+    border-color: #111827;
+    color: #fff;
+}
+
+.menu-seccion + .menu-seccion {
+    margin-top: 24px;
+}
+
+.menu-seccion-titulo {
+    margin-bottom: 12px;
+    text-align: left;
+    font-size: 15px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 16px;
+}
+
+.menu-sin-resultados {
+    padding: 40px 0;
+    text-align: center;
+    color: #6b7280;
+}
+
+.menu-sin-resultados i {
+    font-size: 36px;
+    color: #9ca3af;
+}
+
+.comanda-agregar.agregado {
+    background: #16a34a;
+}

@@ -3,61 +3,65 @@
 namespace App\Http\Controllers;
 
 use App\Models\Categoria;
-use Illuminate\Database\QueryException;
+use App\Support\Sp;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+/**
+ * Catálogo de categorías del menú.
+ * Las lecturas usan Eloquent (paginación); las escrituras pasan por los
+ * procedimientos sp_categoria_insertar / actualizar / eliminar.
+ */
 class CategoriaController extends Controller
 {
-    // ---------- Listado ----------
     public function index()
     {
         $items = Categoria::orderBy('nombre_categoria')->paginate(15);
 
-        return view('modules.admin.categorias.index', compact('items'));
+        return view('admin.categorias.index', compact('items'));
     }
 
-    // ---------- Formulario de creación ----------
     public function create()
     {
-        return view('modules.admin.categorias.form', ['item' => null]);
+        return view('admin.categorias.form', ['item' => null]);
     }
 
-    // ---------- Guardar nueva ----------
     public function store(Request $request)
     {
-        (new Categoria())->forceFill($this->validar($request))->save();
+        $datos = $this->validar($request);
 
-        return redirect()->route('admin.categorias.index')->with('success', 'Categoría creada correctamente.');
+        return $this->intentar(
+            fn () => Sp::insertar('sp_categoria_insertar', $datos, 'id_categoria'),
+            'Categoría creada correctamente.',
+            'admin.categorias.index'
+        );
     }
 
-    // ---------- Formulario de edición ----------
     public function edit($id)
     {
-        return view('modules.admin.categorias.form', ['item' => Categoria::findOrFail($id)]);
+        return view('admin.categorias.form', ['item' => Categoria::findOrFail($id)]);
     }
 
-    // ---------- Actualizar ----------
     public function update(Request $request, $id)
     {
-        Categoria::findOrFail($id)->forceFill($this->validar($request, $id))->save();
+        $datos = ['id_categoria' => (int) $id] + $this->validar($request, $id);
 
-        return redirect()->route('admin.categorias.index')->with('success', 'Categoría actualizada correctamente.');
+        return $this->intentar(
+            fn () => Sp::ejecutar('sp_categoria_actualizar', $datos),
+            'Categoría actualizada correctamente.',
+            'admin.categorias.index'
+        );
     }
 
-    // ---------- Eliminar ----------
     public function destroy($id)
     {
-        try {
-            Categoria::findOrFail($id)->delete();
-        } catch (QueryException $e) {
-            return back()->with('error', 'No se puede eliminar: la categoría tiene productos asociados.');
-        }
-
-        return redirect()->route('admin.categorias.index')->with('success', 'Categoría eliminada correctamente.');
+        return $this->intentar(
+            fn () => Sp::ejecutar('sp_categoria_eliminar', ['id_categoria' => (int) $id]),
+            'Categoría eliminada correctamente.',
+            'admin.categorias.index'
+        );
     }
 
-    // ---------- Validación ----------
     private function validar(Request $request, $id = null): array
     {
         return $request->validate([

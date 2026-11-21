@@ -121,7 +121,8 @@ return [
     'username' => env('DB_MONGO_USERNAME', ''),
     'password' => env('DB_MONGO_PASSWORD', ''),
     'options' => [
-        // 'database' => 'admin'
+        'serverSelectionTimeoutMS' => (int) env('DB_MONGO_TIMEOUT_MS', 2000),
+        'connectTimeoutMS' => (int) env('DB_MONGO_TIMEOUT_MS', 2000),
     ],
 ],
 

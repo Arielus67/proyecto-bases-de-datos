@@ -15,9 +15,10 @@ class ControllerCaja extends Controller
     /** Estados de pedido que se pueden cobrar desde Caja. */
     private const ESTADOS_COBRABLES = ['LISTO', 'ENTREGADO'];
 
-    public function index()
+    public function index(Request $request)
     {
         $sql = DB::connection('sqlsrv');
+        $empleado = $request->user();
 
         $pedidos = $sql->table('PEDIDO as p')
             ->join('MESA as m', 'm.id_mesa', '=', 'p.id_mesa')
@@ -50,36 +51,86 @@ class ControllerCaja extends Controller
             ];
         }
 
-        // Cajeros con turno abierto (temporal, hasta que exista el login)
+        if ($request->ajax()) {
+            return view('cajero.facturas.partials.pedidos', compact('pedidos', 'pedidosJs'));
+        }
+
         $cajeros = $sql->table('TURNO_CAJA as t')
             ->join('EMPLEADO as e', 'e.id_empleado', '=', 't.id_empleado')
             ->whereNull('t.fecha_cierre')
-            ->select('t.id_turno', 'e.id_empleado', DB::raw("e.nombre + ' ' + e.apellido as nombre"))
+            ->when(! $empleado->can('caja.supervisar'), fn ($q) => $q->where('t.id_empleado', $empleado->id_empleado))
+            ->select('t.id_turno', 'e.id_empleado', DB::raw("CONCAT(e.nombre, ' ', e.apellido) as nombre"))
             ->get();
 
         $metodos = MetodoPago::orderBy('nombre_metodo')->get(['id_metodo_pago', 'nombre_metodo']);
 
         $clientes = $sql->table('CLIENTE')
             ->orderBy('apellido')->orderBy('nombre')
-            ->select('id_cliente', DB::raw("nombre + ' ' + apellido as nombre"))
+            ->select('id_cliente', DB::raw("CONCAT(nombre, ' ', apellido) as nombre"))
             ->get();
 
-        return view('modules.caja.index', compact('pedidos', 'pedidosJs', 'cajeros', 'metodos', 'clientes'));
+        $supervisaCajas = $empleado->can('caja.supervisar');
+
+        return view('cajero.facturas.index', compact('pedidos', 'pedidosJs', 'cajeros', 'metodos', 'clientes', 'supervisaCajas'));
+    }
+
+    public function facturas(Request $request)
+    {
+        $empleado = $request->user();
+
+        $facturas = DB::connection('sqlsrv')->table('FACTURA as f')
+            ->join('PEDIDO as p', 'p.id_pedido', '=', 'f.id_pedido')
+            ->join('MESA as m', 'm.id_mesa', '=', 'p.id_mesa')
+            ->when(! $empleado->can('caja.supervisar'), fn ($q) => $q->where('f.id_empleado', $empleado->id_empleado))
+            ->whereDate('f.fecha_hora', '>=', now()->subDays(7)->toDateString())
+            ->orderByDesc('f.fecha_hora')
+            ->limit(100)
+            ->select('f.numero_factura', 'f.fecha_hora', 'f.total', 'f.estado', 'f.id_turno', 'm.numero_mesa')
+            ->get();
+
+        return view('cajero.facturas.emitidas', compact('facturas'));
+    }
+
+    private function puedeOperarTurno(Request $request, int $idTurno): bool
+    {
+        $empleado = $request->user();
+
+        if ($empleado->can('caja.supervisar')) {
+            return true;
+        }
+
+        return DB::connection('sqlsrv')->table('TURNO_CAJA')
+            ->where('id_turno', $idTurno)
+            ->where('id_empleado', $empleado->id_empleado)
+            ->exists();
     }
 
     public function cobrar(Request $request, string $id)
     {
+        if (! $request->user()->can('caja.supervisar')) {
+            $request->merge(['id_cajero' => (int) $request->user()->id_empleado]);
+        }
+
         $datos = $request->validate([
             'id_cajero'                  => ['required', 'integer', 'exists:CAJERO,id_empleado'],
             'id_cliente'                 => ['nullable', 'integer', 'exists:CLIENTE,id_cliente'],
             'descuento'                  => ['nullable', 'numeric', 'between:0,100'],
             'pagos'                      => ['required', 'array', 'min:1'],
             'pagos.*.id_metodo_pago'     => ['required', 'integer', 'exists:METODO_PAGO,id_metodo_pago'],
-            'pagos.*.monto'              => ['required', 'numeric', 'gt:0'],
+            'pagos.*.monto'              => ['required', 'numeric', 'decimal:0,2', 'max:99999999.99', 'gt:0'],
             'pagos.*.referencia'         => ['nullable', 'string', 'max:100'],
         ]);
 
         $idPedido = (int) $id;
+
+        $estado = DB::connection('sqlsrv')->table('PEDIDO')->where('id_pedido', $idPedido)->value('estado');
+
+        if (! in_array($estado, self::ESTADOS_COBRABLES, true)) {
+            return response()->json([
+                'success' => false,
+                'error'   => $estado ? 'El pedido está en estado ' . str_replace('_', ' ', $estado) . ' y no se puede cobrar.' : 'El pedido no existe.',
+            ], 409);
+        }
 
         $pagos = collect($datos['pagos'])->map(fn ($p) => [
             'id_metodo_pago' => (int) $p['id_metodo_pago'],
@@ -149,12 +200,21 @@ class ControllerCaja extends Controller
         ]);
     }
 
-    public function ticket(string $numero)
+    public function ticket(Request $request, string $numero)
     {
         $sql = DB::connection('sqlsrv');
 
         $factura = $sql->table('vw_factura_ticket')->where('numero_factura', $numero)->first();
         abort_if(!$factura, 404);
+
+        $empleado = $request->user();
+
+        abort_if(
+            ! $empleado->can('caja.supervisar')
+                && ! $sql->table('FACTURA')->where('numero_factura', $numero)->where('id_empleado', $empleado->id_empleado)->exists(),
+            403,
+            'Solo puedes consultar las facturas que emitiste.'
+        );
 
         $items = $sql->table('FACTURA as f')
             ->join('DETALLE_PEDIDO as d', 'd.id_pedido', '=', 'f.id_pedido')
@@ -171,15 +231,19 @@ class ControllerCaja extends Controller
             ->select('mp.nombre_metodo', 'pg.monto', 'pg.referencia')
             ->get();
 
-        return view('modules.caja.ticket', compact('factura', 'items', 'pagos'));
+        return view('cajero.facturas.ticket', compact('factura', 'items', 'pagos'));
     }
 
     // ------------------------------------------------------------------
     // CIERRE DE TURNO
     // ------------------------------------------------------------------
 
-    public function resumenTurno(string $id)
+    public function resumenTurno(Request $request, string $id)
     {
+        if (! $this->puedeOperarTurno($request, (int) $id)) {
+            return response()->json(['success' => false, 'error' => 'Solo puedes consultar tu propio turno.'], 403);
+        }
+
         $datos = $this->datosTurno((int) $id);
 
         if (!$datos) {
@@ -192,10 +256,15 @@ class ControllerCaja extends Controller
     public function cerrarTurno(Request $request, string $id)
     {
         $request->validate([
-            'monto_final' => ['required', 'numeric', 'min:0'],
+            'monto_final' => ['required', 'numeric', 'decimal:0,2', 'max:99999999.99', 'min:0'],
         ]);
 
         $idTurno = (int) $id;
+
+        if (! $this->puedeOperarTurno($request, $idTurno)) {
+            return response()->json(['success' => false, 'error' => 'Solo puedes cerrar tu propio turno.'], 403);
+        }
+
         $datos = $this->datosTurno($idTurno);
 
         if (!$datos) {
@@ -209,15 +278,30 @@ class ControllerCaja extends Controller
         $montoFinal = round((float) $request->input('monto_final'), 2);
 
         try {
-            $filas = DB::connection('sqlsrv')->table('TURNO_CAJA')
-                ->where('id_turno', $idTurno)
-                ->whereNull('fecha_cierre')
-                ->update([
-                    'fecha_cierre' => DB::raw('GETDATE()'),
-                    'monto_final'  => $montoFinal,
-                ]);
+            $sql = DB::connection('sqlsrv');
 
-            if ($filas === 0) {
+            $cerrado = $sql->transaction(function () use ($sql, $idTurno, $montoFinal) {
+                $abierto = $sql->table('TURNO_CAJA')
+                    ->where('id_turno', $idTurno)
+                    ->whereNull('fecha_cierre')
+                    ->lockForUpdate()
+                    ->exists();
+
+                if (! $abierto) {
+                    return false;
+                }
+
+                $sql->table('TURNO_CAJA')
+                    ->where('id_turno', $idTurno)
+                    ->update([
+                        'fecha_cierre' => DB::raw('GETDATE()'),
+                        'monto_final'  => $montoFinal,
+                    ]);
+
+                return true;
+            });
+
+            if (! $cerrado) {
                 return response()->json(['success' => false, 'error' => 'Este turno ya está cerrado.'], 409);
             }
         } catch (\Throwable $e) {
@@ -257,7 +341,7 @@ class ControllerCaja extends Controller
             ->join('EMPLEADO as e', 'e.id_empleado', '=', 't.id_empleado')
             ->where('t.id_turno', $idTurno)
             ->select('t.id_turno', 't.fecha_apertura', 't.fecha_cierre', 't.monto_inicial',
-                DB::raw("e.nombre + ' ' + e.apellido as cajero"))
+                DB::raw("CONCAT(e.nombre, ' ', e.apellido) as cajero"))
             ->first();
 
         if (!$turno) {
@@ -267,7 +351,7 @@ class ControllerCaja extends Controller
         $totales = $sql->table('FACTURA')
             ->where('id_turno', $idTurno)
             ->where('estado', 'COBRADA')
-            ->selectRaw('COUNT(*) as facturas, ISNULL(SUM(total), 0) as ventas, ISNULL(SUM(vuelto), 0) as vuelto')
+            ->selectRaw('COUNT(*) as facturas, COALESCE(SUM(total), 0) as ventas, COALESCE(SUM(vuelto), 0) as vuelto')
             ->first();
 
         $metodos = $sql->table('PAGO as pg')

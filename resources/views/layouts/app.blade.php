@@ -9,9 +9,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>Sistema Restaurante - @yield('titulo', 'Inicio')</title>
+    <title>{{ config('app.name') }} - @yield('titulo', 'Inicio')</title>
 
-    <link rel="shortcut icon" href="{{ asset('src/assets/images/logos/favicon.png') }}">
+    <link rel="shortcut icon" href="{{ asset('img/marca/favicon.png') }}">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <link rel="stylesheet" href="{{ asset('src/assets/css/theme.css') }}">
@@ -42,10 +42,10 @@
                     <header class="sticky top-0 z-10 bg-white">
                         <div class="flex items-center justify-between p-4 px-6">
                             <div>
-                                <h2 class="text-lg font-semibold">Sistema Restaurante</h2>
+                                <h2 class="text-lg font-semibold">{{ config('app.name') }}</h2>
                                 <p class="text-sm text-gray-500">Administración del restaurante</p>
                             </div>
-                            <span class="text-sm font-medium">Panel administrativo</span>
+                            @include('layouts.sesion', ['etiqueta' => 'Panel administrativo'])
                         </div>
                     </header>
 
@@ -84,7 +84,7 @@
                      PIE DE PÁGINA (FOOTER)
                      ------------------------------------------------ --}}
                 <footer class="p-5 px-6 text-sm text-gray-500 border-t border-gray-100">
-                    © {{ date('Y') }} Sistema Restaurante
+                    © {{ date('Y') }} {{ config('app.name') }}
                 </footer>
 
             </div>

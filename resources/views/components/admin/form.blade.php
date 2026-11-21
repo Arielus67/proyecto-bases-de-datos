@@ -1,8 +1,8 @@
 {{-- COMPONENTE: contenedor de formulario (crear / editar)
      Uso: <x-admin.form :action="..." :editing="(bool) $item" :cancel="route(...)"> campos </x-admin.form> --}}
-@props(['action', 'editing' => false, 'cancel'])
+@props(['action', 'editing' => false, 'cancel', 'archivos' => false])
 
-<form method="POST" action="{{ $action }}" class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+<form method="POST" action="{{ $action }}" class="bg-white border border-gray-200 rounded-lg shadow-sm p-6" @if ($archivos) enctype="multipart/form-data" @endif>
     @csrf
     @if ($editing)
         @method('PUT')

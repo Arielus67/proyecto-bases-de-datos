@@ -14,13 +14,18 @@ class PedidoController extends Controller
     // ---------- Listado con filtros (estado y fecha) ----------
     public function index(Request $request)
     {
+        $request->validate([
+            'estado' => ['nullable', 'in:ABIERTO,EN_PREPARACION,LISTO,ENTREGADO,FACTURADO,ANULADO'],
+            'fecha' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
         $items = Pedido::with(['mesa', 'empleado'])
             ->when($request->filled('estado'), fn ($q) => $q->where('estado', $request->estado))
             ->when($request->filled('fecha'), fn ($q) => $q->whereDate('fecha_hora', $request->fecha))
             ->orderByDesc('fecha_hora')
             ->paginate(15);
 
-        return view('modules.admin.pedidos.index', compact('items'));
+        return view('admin.pedidos.index', compact('items'));
     }
 
     // ---------- Detalle del pedido ----------
@@ -28,7 +33,7 @@ class PedidoController extends Controller
     {
         $item = Pedido::with(['mesa', 'empleado', 'anuladoPor', 'detalles.producto'])->findOrFail($id);
 
-        return view('modules.admin.pedidos.show', compact('item'));
+        return view('admin.pedidos.show', compact('item'));
     }
 
     // ---------- Anular pedido (no aplica a facturados ni ya anulados) ----------

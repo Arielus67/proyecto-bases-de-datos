@@ -3,61 +3,65 @@
 namespace App\Http\Controllers;
 
 use App\Models\Estacion;
-use Illuminate\Database\QueryException;
+use App\Support\Sp;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+/**
+ * Catálogo de estaciones de cocina (cocina caliente, bebidas, repostería...).
+ * Las lecturas usan Eloquent (paginación); las escrituras pasan por los
+ * procedimientos sp_estacion_insertar / actualizar / eliminar.
+ */
 class EstacionController extends Controller
 {
-    // ---------- Listado ----------
     public function index()
     {
         $items = Estacion::orderBy('nombre_estacion')->paginate(15);
 
-        return view('modules.admin.estaciones.index', compact('items'));
+        return view('admin.estaciones.index', compact('items'));
     }
 
-    // ---------- Formulario de creación ----------
     public function create()
     {
-        return view('modules.admin.estaciones.form', ['item' => null]);
+        return view('admin.estaciones.form', ['item' => null]);
     }
 
-    // ---------- Guardar nueva ----------
     public function store(Request $request)
     {
-        (new Estacion())->forceFill($this->validar($request))->save();
+        $datos = $this->validar($request);
 
-        return redirect()->route('admin.estaciones.index')->with('success', 'Estación creada correctamente.');
+        return $this->intentar(
+            fn () => Sp::insertar('sp_estacion_insertar', $datos, 'id_estacion'),
+            'Estación creada correctamente.',
+            'admin.estaciones.index'
+        );
     }
 
-    // ---------- Formulario de edición ----------
     public function edit($id)
     {
-        return view('modules.admin.estaciones.form', ['item' => Estacion::findOrFail($id)]);
+        return view('admin.estaciones.form', ['item' => Estacion::findOrFail($id)]);
     }
 
-    // ---------- Actualizar ----------
     public function update(Request $request, $id)
     {
-        Estacion::findOrFail($id)->forceFill($this->validar($request, $id))->save();
+        $datos = ['id_estacion' => (int) $id] + $this->validar($request, $id);
 
-        return redirect()->route('admin.estaciones.index')->with('success', 'Estación actualizada correctamente.');
+        return $this->intentar(
+            fn () => Sp::ejecutar('sp_estacion_actualizar', $datos),
+            'Estación actualizada correctamente.',
+            'admin.estaciones.index'
+        );
     }
 
-    // ---------- Eliminar ----------
     public function destroy($id)
     {
-        try {
-            Estacion::findOrFail($id)->delete();
-        } catch (QueryException $e) {
-            return back()->with('error', 'No se puede eliminar: la estación tiene productos o cocineros asociados.');
-        }
-
-        return redirect()->route('admin.estaciones.index')->with('success', 'Estación eliminada correctamente.');
+        return $this->intentar(
+            fn () => Sp::ejecutar('sp_estacion_eliminar', ['id_estacion' => (int) $id]),
+            'Estación eliminada correctamente.',
+            'admin.estaciones.index'
+        );
     }
 
-    // ---------- Validación ----------
     private function validar(Request $request, $id = null): array
     {
         return $request->validate([

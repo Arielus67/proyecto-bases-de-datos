@@ -1,0 +1,169 @@
+:root {
+    --cristal-fondo: rgb(255 255 255 / 64%);
+    --cristal-fondo-hover: rgb(255 255 255 / 72%);
+    --cristal-interior: rgb(255 255 255 / 46%);
+    --cristal-campo: rgb(255 255 255 / 82%);
+    --cristal-borde: rgb(255 255 255 / 60%);
+    --cristal-linea: rgb(15 23 20 / 10%);
+    --cristal-desenfoque: blur(20px) saturate(150%);
+    --cristal-sombra: 0 1px 0 rgb(255 255 255 / 55%) inset, 0 18px 40px -24px rgb(10 25 18 / 45%), 0 2px 8px -4px rgb(10 25 18 / 18%);
+    --cristal-sombra-hover: 0 1px 0 rgb(255 255 255 / 65%) inset, 0 26px 50px -26px rgb(10 25 18 / 55%), 0 4px 12px -6px rgb(10 25 18 / 22%);
+}
+
+body.DEFAULT_THEME {
+    position: relative;
+    background: #33473d;
+}
+
+body.DEFAULT_THEME::before,
+body.DEFAULT_THEME::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+}
+
+body.DEFAULT_THEME::before {
+    background: url("../../img/fondos/pinos.jpg") center 62% / cover no-repeat;
+    filter: blur(8px) saturate(115%);
+    transform: scale(1.08);
+}
+
+body.DEFAULT_THEME::after {
+    background:
+        linear-gradient(180deg, rgb(244 247 245 / 30%) 0%, rgb(244 247 245 / 18%) 45%, rgb(20 35 28 / 22%) 100%);
+}
+
+#main-wrapper .page-wrapper {
+    background: transparent;
+}
+
+#main-wrapper .page-wrapper > div > header {
+    border-bottom-color: var(--cristal-borde);
+    background: rgb(255 255 255 / 58%);
+    -webkit-backdrop-filter: var(--cristal-desenfoque);
+    backdrop-filter: var(--cristal-desenfoque);
+}
+
+#main-wrapper .page-wrapper > footer,
+#main-wrapper .page-wrapper > footer * {
+    color: rgb(255 255 255 / 85%);
+    text-shadow: 0 1px 2px rgb(0 0 0 / 35%);
+}
+
+.page-wrapper h1.text-2xl,
+.page-wrapper h1.text-2xl + p {
+    text-shadow: 0 1px 0 rgb(255 255 255 / 55%);
+}
+
+.page-wrapper .bg-white.border.rounded-lg,
+.page-wrapper :is(.kpi, .panel, .acceso-rapido) {
+    border-color: var(--cristal-borde);
+    background: var(--cristal-fondo);
+    -webkit-backdrop-filter: var(--cristal-desenfoque);
+    backdrop-filter: var(--cristal-desenfoque);
+    box-shadow: var(--cristal-sombra);
+}
+
+.page-wrapper .bg-white.border.rounded-lg.shadow-sm:hover,
+.page-wrapper :is(.panel, .acceso-rapido):hover {
+    background: var(--cristal-fondo-hover);
+    box-shadow: var(--cristal-sombra-hover);
+}
+
+.page-wrapper .bg-white.border.border-red-200.rounded-lg {
+    border-color: rgb(254 202 202 / 85%);
+    background: linear-gradient(180deg, rgb(254 242 242 / 70%), var(--cristal-fondo) 70%);
+}
+
+.page-wrapper .kpi--alerta {
+    border-color: rgb(254 202 202 / 85%);
+    background: linear-gradient(180deg, rgb(254 242 242 / 72%), var(--cristal-fondo) 70%);
+}
+
+.page-wrapper .kpi--principal {
+    border-color: rgb(255 255 255 / 14%);
+    background:
+        radial-gradient(120% 90% at 100% 0%, rgb(255 255 255 / 12%), transparent 55%),
+        linear-gradient(160deg, rgb(28 28 28 / 78%), rgb(8 8 8 / 82%));
+    box-shadow: 0 1px 0 rgb(255 255 255 / 12%) inset, 0 22px 44px -24px rgb(0 0 0 / 60%);
+}
+
+.page-wrapper table.min-w-full thead,
+.page-wrapper .pedidos thead {
+    background: var(--cristal-interior);
+}
+
+.page-wrapper table.min-w-full tbody tr:hover,
+.page-wrapper .pedidos tbody tr:hover {
+    background: rgb(255 255 255 / 48%);
+}
+
+.page-wrapper table.min-w-full :is(tr, td, th),
+.page-wrapper :is(.border-t, .border-b, .divide-y > *) {
+    border-color: var(--cristal-linea);
+}
+
+.page-wrapper :is(.cifras div, .plano__mesa:not(.plano__mesa--ocupada), .reponer__item, .segmentado, .ranking__barra, .pedidos__avatar, .rounded-md.bg-gray-50) {
+    background-color: var(--cristal-interior);
+}
+
+.page-wrapper .plano__mesa--ocupada {
+    border-color: rgb(10 10 10 / 70%);
+    background: rgb(12 12 12 / 82%);
+}
+
+.page-wrapper .segmentado__opcion.activo {
+    background: rgb(255 255 255 / 88%);
+}
+
+.page-wrapper :is(input, select, textarea).border-gray-300,
+.page-wrapper .filtros__busqueda,
+.page-wrapper .filtros select {
+    border-color: rgb(15 23 20 / 16%);
+    background-color: var(--cristal-campo);
+}
+
+.page-wrapper :is(input, select, textarea).border-gray-300:focus {
+    background-color: #fff;
+}
+
+.page-wrapper .rounded-md.border.border-gray-300:is(a, button) {
+    border-color: rgb(15 23 20 / 14%);
+    background: rgb(255 255 255 / 70%);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+
+.page-wrapper .rounded-md.border.border-gray-300:is(a, button):hover {
+    background: rgb(255 255 255 / 90%);
+}
+
+.page-wrapper :is(.bg-green-50.border-green-200, .bg-red-50.border-red-200) {
+    -webkit-backdrop-filter: var(--cristal-desenfoque);
+    backdrop-filter: var(--cristal-desenfoque);
+}
+
+.page-wrapper .bg-green-50.border-green-200 {
+    background: rgb(240 253 244 / 82%);
+}
+
+.page-wrapper .bg-red-50.border-red-200 {
+    background: rgb(254 242 242 / 82%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root {
+        --cristal-fondo: rgb(255 255 255 / 90%);
+        --cristal-fondo-hover: rgb(255 255 255 / 94%);
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    :root {
+        --cristal-fondo: rgb(255 255 255 / 94%);
+        --cristal-fondo-hover: #fff;
+        --cristal-interior: rgb(250 250 250 / 96%);
+    }
+}

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use App\Models\Mesa;
 use App\Models\Producto;
@@ -15,7 +16,7 @@ class ControllerMesa extends Controller
     /** Estados de pedido que siguen abiertos (la mesa puede pedir más productos). */
     private const ESTADOS_ABIERTOS = ['ABIERTO', 'EN_PREPARACION', 'LISTO', 'ENTREGADO'];
 
-    public function index()
+    public function index(Request $request)
     {
         $mesas = Mesa::orderBy('numero_mesa')->get();
 
@@ -43,20 +44,33 @@ class ControllerMesa extends Controller
             ->get()
             ->groupBy('id_pedido');
 
-        return view('modules.mesero.index', compact('mesas', 'pedidosActivos', 'listos', 'detallesListos'));
+        $vista = $request->ajax() ? 'mesero.mesas.partials.estado' : 'mesero.mesas.index';
+
+        return view($vista, compact('mesas', 'pedidosActivos', 'listos', 'detallesListos'));
     }
 
     public function productosMesa($id)
     {
         $mesa = Mesa::where('id_mesa', $id)->firstOrFail();
 
-        $productos = Producto::where('activo', 1)
+        $productos = Producto::with('categoria')
+            ->where('activo', 1)
             ->orderBy('nombre_producto')
             ->get();
 
+        $categorias = $productos
+            ->groupBy('id_categoria')
+            ->map(fn ($grupo) => [
+                'id' => (int) $grupo->first()->id_categoria,
+                'nombre' => $grupo->first()->categoria->nombre_categoria ?? 'Sin categoría',
+                'productos' => $grupo->values(),
+            ])
+            ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
         return view(
-            'modules.mesero.partials.menu-productos',
-            compact('mesa', 'productos')
+            'mesero.menu.productos',
+            compact('mesa', 'categorias')
         );
     }
 
@@ -68,10 +82,15 @@ class ControllerMesa extends Controller
         $datos = $request->validate([
             'token_idempotencia' => ['required', 'string', 'max:100'],
             'id_mesa' => ['required', 'integer'],
-            'id_empleado' => ['required', 'integer'],
-            'observaciones' => ['nullable', 'string'],
+            'observaciones' => ['nullable', 'string', 'max:255'],
             'detalles' => ['required', 'array', 'min:1'],
+            'detalles.*.num_linea' => ['required', 'integer', 'min:1'],
+            'detalles.*.id_producto' => ['required', 'integer'],
+            'detalles.*.cantidad' => ['required', 'integer', 'min:1', 'max:999'],
+            'detalles.*.notas' => ['nullable', 'string', 'max:200'],
         ]);
+
+        $datos['id_empleado'] = (int) $request->user()->id_empleado;
 
         try {
             $jsonLineas = json_encode($datos['detalles'], JSON_THROW_ON_ERROR);
@@ -114,13 +133,39 @@ class ControllerMesa extends Controller
             }
 
         } catch (\Throwable $ex) {
+            if (! $this->esDuplicado($ex)) {
+                Log::error('Error al registrar pedido', ['error' => $ex->getMessage()]);
 
-            Log::error('Error al registrar pedido', ['error' => $ex->getMessage()]);
+                return response()->json([
+                    'success' => false,
+                    'error' => $this->mensajeSql($ex),
+                ], 422);
+            }
+
+            $sql = DB::connection('sqlsrv');
+
+            $mismoToken = $sql->table('PEDIDO')
+                ->where('token_idempotencia', $datos['token_idempotencia'])
+                ->value('id_pedido');
+
+            if ($mismoToken) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'El pedido ya estaba registrado.',
+                    'id_pedido' => (int) $mismoToken,
+                ]);
+            }
+
+            $abierto = $sql->table('PEDIDO')
+                ->where('id_mesa', $datos['id_mesa'])
+                ->whereIn('estado', self::ESTADOS_ABIERTOS)
+                ->value('id_pedido');
 
             return response()->json([
                 'success' => false,
-                'error' => $this->mensajeSql($ex),
-            ], 422);
+                'error' => 'La mesa ya tiene un pedido abierto' . ($abierto ? ' (#' . $abierto . ')' : '') . '. Agrega los productos a ese pedido.',
+                'id_pedido_abierto' => $abierto ? (int) $abierto : null,
+            ], 409);
         }
 
         // El pedido ya quedó en SQL Server. Si MongoDB falla no se devuelve error al mesero:
@@ -149,7 +194,7 @@ class ControllerMesa extends Controller
         $datos = $request->validate([
             'detalles' => ['required', 'array', 'min:1'],
             'detalles.*.id_producto' => ['required', 'integer'],
-            'detalles.*.cantidad' => ['required', 'integer', 'min:1'],
+            'detalles.*.cantidad' => ['required', 'integer', 'min:1', 'max:999'],
             'detalles.*.notas' => ['nullable', 'string', 'max:200'],
         ]);
 
@@ -175,7 +220,8 @@ class ControllerMesa extends Controller
 
         // SQL ya quedó confirmado; si MongoDB falla, cocina lo recupera desde SQL Server
         try {
-            $this->ampliarComanda($idPedido, $lineas);
+            Cache::lock(ComandaNoSql::llaveBloqueo($idPedido), 10)
+                ->block(5, fn () => $this->ampliarComanda($idPedido, $lineas));
         } catch (\Throwable $ex) {
             Log::warning('Productos agregados en SQL, pero falló MongoDB', ['pedido' => $idPedido, 'error' => $ex->getMessage()]);
         }
@@ -193,14 +239,18 @@ class ControllerMesa extends Controller
 
         try {
             $sql->transaction(function () use ($sql, $idPedido) {
-                $filas = $sql->table('PEDIDO')
+                $actual = $sql->table('PEDIDO')
                     ->where('id_pedido', $idPedido)
-                    ->where('estado', 'LISTO')
-                    ->update(['estado' => 'ENTREGADO']);
+                    ->lockForUpdate()
+                    ->value('estado');
 
-                if ($filas === 0) {
-                    throw new \RuntimeException('El pedido no está listo para entregar.');
+                if ($actual !== 'LISTO') {
+                    throw new \DomainException('El pedido no está listo para entregar.');
                 }
+
+                $sql->table('PEDIDO')
+                    ->where('id_pedido', $idPedido)
+                    ->update(['estado' => 'ENTREGADO']);
 
                 $sql->table('DETALLE_PEDIDO')
                     ->where('id_pedido', $idPedido)
@@ -210,7 +260,7 @@ class ControllerMesa extends Controller
                         'fecha_actualizacion' => DB::raw('GETDATE()'),
                     ]);
             });
-        } catch (\RuntimeException $e) {
+        } catch (\DomainException $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 409);
         } catch (\Throwable $e) {
             Log::error('Error al entregar pedido', ['pedido' => $idPedido, 'error' => $e->getMessage()]);
@@ -244,6 +294,12 @@ class ControllerMesa extends Controller
 
     /** Crea la comanda en MongoDB (si el pedido ya tenía comanda, no la duplica). */
     private function guardarComanda(int $idPedido, array $datos): void
+    {
+        Cache::lock(ComandaNoSql::llaveBloqueo($idPedido), 10)
+            ->block(5, fn () => $this->crearComanda($idPedido, $datos));
+    }
+
+    private function crearComanda(int $idPedido, array $datos): void
     {
         if (ComandaNoSql::where('id_pedido_sql', $idPedido)->exists()) {
             return;

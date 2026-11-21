@@ -2,24 +2,33 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Mesa;
 use App\Models\Producto;
 use App\Models\ComandaNoSql;
 use App\Models\TiempoCocinaNoSql;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ControllerCocina extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Si algún pedido quedó en SQL Server sin comanda en MongoDB, se reconstruye antes de mostrar
-        $this->recuperarComandasPerdidas();
+        $sinMongo = false;
 
-        $comandas = ComandaNoSql::whereIn('estado', ['ABIERTO', 'EN_PREPARACION'])
-            ->orderBy('created_at', 'asc')
-            ->get();
+        try {
+            $this->recuperarComandasPerdidas();
+
+            $comandas = ComandaNoSql::whereIn('estado', ['ABIERTO', 'EN_PREPARACION'])
+                ->orderBy('created_at', 'asc')
+                ->get();
+        } catch (\Throwable $e) {
+            Log::warning('MongoDB no disponible: la cocina se muestra desde SQL Server', ['error' => $e->getMessage()]);
+            $comandas = $this->comandasDesdeSqlServer();
+            $sinMongo = true;
+        }
 
         $idsProductos = $comandas
             ->flatMap(fn ($c) => collect($c->detalles_con_modificadores)->pluck('id_producto'))
@@ -35,7 +44,47 @@ class ControllerCocina extends Controller
                 ->toArray();
         }
 
-        return view('modules.cocina.index', compact('comandas', 'nombresProductos'));
+        $numerosMesa = Mesa::whereIn('id_mesa', $comandas->pluck('id_mesa')->unique()->values()->all())
+            ->pluck('numero_mesa', 'id_mesa')
+            ->toArray();
+
+        $vista = $request->ajax() ? 'cocina.comandas.partials.grid' : 'cocina.comandas.index';
+
+        return view($vista, compact('comandas', 'nombresProductos', 'numerosMesa', 'sinMongo'));
+    }
+
+    private function comandasDesdeSqlServer()
+    {
+        $sql = DB::connection('sqlsrv');
+
+        $pedidos = $sql->table('PEDIDO')
+            ->whereIn('estado', ['ABIERTO', 'EN_PREPARACION'])
+            ->orderBy('fecha_hora')
+            ->get(['id_pedido', 'id_mesa', 'estado', 'fecha_hora']);
+
+        $lineas = $sql->table('DETALLE_PEDIDO')
+            ->whereIn('id_pedido', $pedidos->pluck('id_pedido'))
+            ->whereIn('estado_cocina', ['PENDIENTE', 'PREPARANDO'])
+            ->orderBy('num_linea')
+            ->get()
+            ->groupBy('id_pedido');
+
+        return $pedidos->map(fn ($p) => (new ComandaNoSql)->forceFill([
+            '_id' => (string) $p->id_pedido,
+            'id_pedido_sql' => (int) $p->id_pedido,
+            'id_mesa' => (int) $p->id_mesa,
+            'estado' => $p->estado,
+            'ronda_actual' => 1,
+            'ronda_at' => Carbon::parse($p->fecha_hora),
+            'created_at' => Carbon::parse($p->fecha_hora),
+            'detalles_con_modificadores' => ($lineas[$p->id_pedido] ?? collect())->map(fn ($d) => [
+                'num_linea' => (int) $d->num_linea,
+                'id_producto' => (int) $d->id_producto,
+                'cantidad' => (int) $d->cantidad,
+                'notas' => $d->notas ?? '',
+                'ronda' => 1,
+            ])->values()->all(),
+        ]));
     }
 
     public function update(Request $request, string $id)
@@ -53,8 +102,14 @@ class ControllerCocina extends Controller
             return response()->json(['success' => false, 'message' => 'Estado no válido.'], 422);
         }
 
-        $comandaMongo = ComandaNoSql::where('_id', $id)->first()
-                        ?? ComandaNoSql::where('id_pedido_sql', (int) $id)->first();
+        try {
+            $comandaMongo = ComandaNoSql::where('_id', $id)->first()
+                            ?? ComandaNoSql::where('id_pedido_sql', (int) $id)->first();
+        } catch (\Throwable $e) {
+            Log::warning('MongoDB no disponible al actualizar cocina', ['error' => $e->getMessage()]);
+
+            return response()->json(['success' => false, 'message' => 'MongoDB no está disponible. Los cambios de estado se habilitan cuando vuelva la conexión.'], 503);
+        }
 
         if (!$comandaMongo) {
             return response()->json(['success' => false, 'message' => 'No se encontró la comanda.'], 404);
@@ -70,14 +125,20 @@ class ControllerCocina extends Controller
         try {
             // 1. SQL Server: pedido y líneas, en una sola transacción
             $sql->transaction(function () use ($sql, $idPedidoSql, $nuevoEstado, $origenesPermitidos, $estadoLinea, $lineasOrigen) {
-                $filas = $sql->table('PEDIDO')
+                $actual = $sql->table('PEDIDO')
                     ->where('id_pedido', $idPedidoSql)
-                    ->whereIn('estado', $origenesPermitidos[$nuevoEstado])
-                    ->update(['estado' => $nuevoEstado]);
+                    ->lockForUpdate()
+                    ->value('estado');
 
-                if ($filas === 0) {
-                    throw new \RuntimeException('Esta comanda ya cambió de estado desde otra pantalla.');
+                if (! in_array($actual, $origenesPermitidos[$nuevoEstado], true)) {
+                    throw new \DomainException($actual
+                        ? 'Este pedido ya está en estado ' . str_replace('_', ' ', $actual) . '. La pantalla se actualizará.'
+                        : 'El pedido de esta comanda no existe en SQL Server.');
                 }
+
+                $sql->table('PEDIDO')
+                    ->where('id_pedido', $idPedidoSql)
+                    ->update(['estado' => $nuevoEstado]);
 
                 $sql->table('DETALLE_PEDIDO')
                     ->where('id_pedido', $idPedidoSql)
@@ -114,7 +175,7 @@ class ControllerCocina extends Controller
 
             return response()->json(['success' => true, 'message' => 'Estado de cocina actualizado correctamente']);
 
-        } catch (\RuntimeException $e) {
+        } catch (\DomainException $e) {
             // El pedido ya no estaba en el estado esperado: alinear MongoDB con SQL Server
             try {
                 $actual = $sql->table('PEDIDO')->where('id_pedido', $idPedidoSql)->value('estado');
@@ -164,53 +225,74 @@ class ControllerCocina extends Controller
                     continue;
                 }
 
-                $ronda = $comanda ? ((int) ($comanda->ronda_actual ?? 1)) + 1 : 1;
+                $bloqueo = Cache::lock(ComandaNoSql::llaveBloqueo((int) $p->id_pedido), 10);
 
-                $detalles = $sql->table('DETALLE_PEDIDO')
-                    ->where('id_pedido', $p->id_pedido)
-                    ->whereIn('estado_cocina', ['PENDIENTE', 'PREPARANDO'])
-                    ->orderBy('num_linea')
-                    ->get()
-                    ->map(fn ($d) => [
-                        'num_linea'   => (int) $d->num_linea,
-                        'id_producto' => (int) $d->id_producto,
-                        'cantidad'    => (int) $d->cantidad,
-                        'notas'       => $d->notas ?? '',
-                        'ronda'       => $ronda,
-                    ])
-                    ->all();
-
-                // Comanda cerrada en MongoDB, pero el pedido se reabrió en SQL: se suma la ronda perdida
-                if ($comanda) {
-                    $comanda->detalles_con_modificadores = collect($comanda->detalles_con_modificadores ?? [])
-                        ->merge($detalles)
-                        ->values()
-                        ->all();
-                    $comanda->estado = $p->estado;
-                    $comanda->ronda_actual = $ronda;
-                    $comanda->ronda_at = now();
-                    $comanda->save();
-
+                if (! $bloqueo->get()) {
                     continue;
                 }
 
-                // Pedido sin comanda en MongoDB: se crea desde SQL Server
-                $inicio = Carbon::parse($p->fecha_hora);
-
-                ComandaNoSql::create([
-                    'id_pedido_sql'              => (int) $p->id_pedido,
-                    'token_idempotencia'         => $p->token_idempotencia,
-                    'id_mesa'                    => (int) $p->id_mesa,
-                    'id_empleado'                => (int) $p->id_empleado,
-                    'estado'                     => $p->estado,
-                    'detalles_con_modificadores' => $detalles,
-                    'tiempos_cocina'             => ['enviado_at' => $inicio, 'preparando_at' => null, 'listo_at' => null],
-                    'ronda_actual'               => 1,
-                    'ronda_at'                   => $inicio,
-                ]);
+                try {
+                    $this->recuperarComanda($sql, $p);
+                } finally {
+                    $bloqueo->release();
+                }
             }
         } catch (\Throwable $e) {
             Log::warning('No se pudieron recuperar comandas desde SQL Server', ['error' => $e->getMessage()]);
         }
+    }
+
+    private function recuperarComanda($sql, $p): void
+    {
+        $comanda = ComandaNoSql::where('id_pedido_sql', (int) $p->id_pedido)->first();
+
+        if ($comanda && in_array($comanda->estado, ['ABIERTO', 'EN_PREPARACION'], true)) {
+            return;
+        }
+
+        $ronda = $comanda ? ((int) ($comanda->ronda_actual ?? 1)) + 1 : 1;
+
+        $detalles = $sql->table('DETALLE_PEDIDO')
+            ->where('id_pedido', $p->id_pedido)
+            ->whereIn('estado_cocina', ['PENDIENTE', 'PREPARANDO'])
+            ->orderBy('num_linea')
+            ->get()
+            ->map(fn ($d) => [
+                'num_linea'   => (int) $d->num_linea,
+                'id_producto' => (int) $d->id_producto,
+                'cantidad'    => (int) $d->cantidad,
+                'notas'       => $d->notas ?? '',
+                'ronda'       => $ronda,
+            ])
+            ->all();
+
+        // Comanda cerrada en MongoDB, pero el pedido se reabrió en SQL: se suma la ronda perdida
+        if ($comanda) {
+            $comanda->detalles_con_modificadores = collect($comanda->detalles_con_modificadores ?? [])
+                ->merge($detalles)
+                ->values()
+                ->all();
+            $comanda->estado = $p->estado;
+            $comanda->ronda_actual = $ronda;
+            $comanda->ronda_at = now();
+            $comanda->save();
+
+            return;
+        }
+
+        // Pedido sin comanda en MongoDB: se crea desde SQL Server
+        $inicio = Carbon::parse($p->fecha_hora);
+
+        ComandaNoSql::create([
+            'id_pedido_sql'              => (int) $p->id_pedido,
+            'token_idempotencia'         => $p->token_idempotencia,
+            'id_mesa'                    => (int) $p->id_mesa,
+            'id_empleado'                => (int) $p->id_empleado,
+            'estado'                     => $p->estado,
+            'detalles_con_modificadores' => $detalles,
+            'tiempos_cocina'             => ['enviado_at' => $inicio, 'preparando_at' => null, 'listo_at' => null],
+            'ronda_actual'               => 1,
+            'ronda_at'                   => $inicio,
+        ]);
     }
 }

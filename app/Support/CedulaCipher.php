@@ -2,17 +2,16 @@
 
 namespace App\Support;
 
-use Illuminate\Contracts\Database\Query\Expression;
-use Illuminate\Support\Facades\DB;
-
 /**
  * Cifrado de la cédula del cliente (columna CLIENTE.cedula VARBINARY(256)).
  *
- * Usa AES-256-CBC con una llave derivada de APP_KEY. El resultado binario es:
- *   [16 bytes de IV] + [texto cifrado]
+ * AES-256-CBC con una llave derivada de APP_KEY. Lo que se guarda es:
+ *   [16 bytes de IV aleatorio] + [texto cifrado]
+ * Como el IV cambia en cada cifrado, la misma cédula produce bytes distintos
+ * cada vez (no se puede saber si dos clientes tienen la misma cédula mirando la tabla).
  *
- * Si tu base de datos cifra con ENCRYPTBYKEY (llave simétrica de SQL Server),
- * reemplaza estos métodos por llamadas a ese cifrado.
+ * La llave vive en el servidor web (.env), nunca en la base de datos: un respaldo
+ * .bak robado no sirve para leer las cédulas.
  */
 class CedulaCipher
 {
@@ -54,10 +53,11 @@ class CedulaCipher
         return str_repeat('•', max(strlen($plano) - 4, 0)) . substr($plano, -4);
     }
 
-    // ---------- Valor listo para insertar en una columna VARBINARY de SQL Server ----------
-    // Se envía como hexadecimal y SQL Server lo convierte (evita errores de nvarchar -> varbinary).
-    public static function paraSql(string $plano): Expression
+    // ---------- Valor para sp_cliente_insertar / actualizar ----------
+    // Se envía cifrado y en hexadecimal; el procedimiento lo convierte a VARBINARY
+    // (el driver de PHP no puede enlazar binario directamente a un parámetro VARBINARY).
+    public static function paraSp(string $plano): string
     {
-        return DB::raw("CONVERT(VARBINARY(256), '0x" . bin2hex(self::cifrar($plano)) . "', 1)");
+        return bin2hex(self::cifrar($plano));
     }
 }

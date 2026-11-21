@@ -1,0 +1,247 @@
+[
+  {
+    "grupo": "Acceso sin sesión",
+    "prueba": "GET /",
+    "esperado": "302 al login",
+    "obtenido": "302 /login",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin sesión",
+    "prueba": "GET /admin",
+    "esperado": "302 al login",
+    "obtenido": "302 /login",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin sesión",
+    "prueba": "GET /admin/empleados",
+    "esperado": "302 al login",
+    "obtenido": "302 /login",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin sesión",
+    "prueba": "GET /admin/roles",
+    "esperado": "302 al login",
+    "obtenido": "302 /login",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin sesión",
+    "prueba": "GET /admin/respaldos",
+    "esperado": "302 al login",
+    "obtenido": "302 /login",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin sesión",
+    "prueba": "GET /mesero",
+    "esperado": "302 al login",
+    "obtenido": "302 /login",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin sesión",
+    "prueba": "GET /cocina",
+    "esperado": "302 al login",
+    "obtenido": "302 /login",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin sesión",
+    "prueba": "GET /caja",
+    "esperado": "302 al login",
+    "obtenido": "302 /login",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin sesión",
+    "prueba": "GET /caja/facturas",
+    "esperado": "302 al login",
+    "obtenido": "302 /login",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin sesión",
+    "prueba": "GET /admin/reportes/ventas",
+    "esperado": "302 al login",
+    "obtenido": "302 /login",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin permiso (mesero)",
+    "prueba": "GET /admin",
+    "esperado": "403",
+    "obtenido": "403",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin permiso (mesero)",
+    "prueba": "GET /admin/productos",
+    "esperado": "403",
+    "obtenido": "403",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin permiso (mesero)",
+    "prueba": "GET /caja",
+    "esperado": "403",
+    "obtenido": "403",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin permiso (mesero)",
+    "prueba": "GET /cocina",
+    "esperado": "403",
+    "obtenido": "403",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin permiso (mesero)",
+    "prueba": "POST /admin/respaldos",
+    "esperado": "403",
+    "obtenido": "403",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin permiso (mesero)",
+    "prueba": "POST /caja/cobrar/1",
+    "esperado": "403",
+    "obtenido": "403",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin permiso (mesero)",
+    "prueba": "PUT /cocina/actualizar-estado/1",
+    "esperado": "403",
+    "obtenido": "403",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin permiso (mesero)",
+    "prueba": "DELETE /admin/productos/1",
+    "esperado": "403",
+    "obtenido": "403",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin permiso (mesero)",
+    "prueba": "GET /admin/respaldos/restaurar",
+    "esperado": "403",
+    "obtenido": "403",
+    "ok": true
+  },
+  {
+    "grupo": "Acceso sin permiso (mesero)",
+    "prueba": "Los productos siguen intactos tras el DELETE rechazado",
+    "esperado": "[[9]]",
+    "obtenido": "[[9]]",
+    "ok": true
+  },
+  {
+    "grupo": "Sesiones",
+    "prueba": "El identificador de sesión cambia al iniciar sesión (fijación de sesión)",
+    "esperado": "distinto",
+    "obtenido": "distinto",
+    "ok": true
+  },
+  {
+    "grupo": "Sesiones",
+    "prueba": "Cookie de sesión HttpOnly y SameSite",
+    "esperado": "httponly; samesite=lax",
+    "obtenido": "expires=sat, 21 nov 2026 03:12:24 gmt; max-age=7200; path=/; httponly; samesite=lax",
+    "ok": true
+  },
+  {
+    "grupo": "CSRF",
+    "prueba": "POST /admin/roles sin token CSRF",
+    "esperado": "419",
+    "obtenido": "419",
+    "ok": true
+  },
+  {
+    "grupo": "CSRF",
+    "prueba": "POST /admin/roles con token inventado",
+    "esperado": "419",
+    "obtenido": "419",
+    "ok": true
+  },
+  {
+    "grupo": "XSS",
+    "prueba": "Nombre de rol con <script> se muestra escapado",
+    "esperado": "texto escapado, sin <script> ejecutable",
+    "obtenido": "escapado",
+    "ok": true
+  },
+  {
+    "grupo": "Inyección SQL",
+    "prueba": "GET /admin/pedidos?estado=' OR 1=1 --",
+    "esperado": "rechazado (302 validación / 404), nunca 500",
+    "obtenido": "302",
+    "ok": true
+  },
+  {
+    "grupo": "Inyección SQL",
+    "prueba": "GET /admin/pedidos?fecha=2026-01-01' OR '1'='1",
+    "esperado": "rechazado (302 validación / 404), nunca 500",
+    "obtenido": "302",
+    "ok": true
+  },
+  {
+    "grupo": "Inyección SQL",
+    "prueba": "GET /admin/auditoria?id_pedido=1;DROP TABLE PEDIDO",
+    "esperado": "rechazado (302 validación / 404), nunca 500",
+    "obtenido": "302",
+    "ok": true
+  },
+  {
+    "grupo": "Inyección SQL",
+    "prueba": "GET /admin/productos/1' OR '1'='1/edit",
+    "esperado": "rechazado (302 validación / 404), nunca 500",
+    "obtenido": "404",
+    "ok": true
+  },
+  {
+    "grupo": "Inyección SQL",
+    "prueba": "Login con correo y contraseña inyectados",
+    "esperado": "no entra",
+    "obtenido": "no entra",
+    "ok": true
+  },
+  {
+    "grupo": "Inyección SQL",
+    "prueba": "Ninguna tabla fue eliminada",
+    "esperado": "[[25]]",
+    "obtenido": "[[25]]",
+    "ok": true
+  },
+  {
+    "grupo": "Información confidencial",
+    "prueba": "El listado de empleados no expone hashes de contraseña",
+    "esperado": "sin $2y$",
+    "obtenido": "sin hashes",
+    "ok": true
+  },
+  {
+    "grupo": "Concurrencia",
+    "prueba": "20 inicios de sesión simultáneos con la misma cuenta",
+    "esperado": "1 sesión activa",
+    "obtenido": "1 sesión(es) con acceso, filas SESION_ACTIVA=[[1]]",
+    "ok": true
+  },
+  {
+    "grupo": "Concurrencia",
+    "prueba": "15 administradores crean el mismo rol a la vez",
+    "esperado": "1 rol creado, ningún 500",
+    "obtenido": "roles=[[1]], respuestas={\"302\":15}",
+    "ok": true
+  },
+  {
+    "grupo": "Concurrencia",
+    "prueba": "Ningún rol quedó sin permisos (transacción completa)",
+    "esperado": "0",
+    "obtenido": "[[0]]",
+    "ok": true
+  }
+]

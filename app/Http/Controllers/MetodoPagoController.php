@@ -3,61 +3,65 @@
 namespace App\Http\Controllers;
 
 use App\Models\MetodoPago;
-use Illuminate\Database\QueryException;
+use App\Support\Sp;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+/**
+ * Catálogo de métodos de pago (efectivo, tarjeta, SINPE...).
+ * Las lecturas usan Eloquent (paginación); las escrituras pasan por los
+ * procedimientos sp_metodo_pago_insertar / actualizar / eliminar.
+ */
 class MetodoPagoController extends Controller
 {
-    // ---------- Listado ----------
     public function index()
     {
         $items = MetodoPago::orderBy('nombre_metodo')->paginate(15);
 
-        return view('modules.admin.metodos-pago.index', compact('items'));
+        return view('admin.metodos-pago.index', compact('items'));
     }
 
-    // ---------- Formulario de creación ----------
     public function create()
     {
-        return view('modules.admin.metodos-pago.form', ['item' => null]);
+        return view('admin.metodos-pago.form', ['item' => null]);
     }
 
-    // ---------- Guardar nuevo ----------
     public function store(Request $request)
     {
-        (new MetodoPago())->forceFill($this->validar($request))->save();
+        $datos = $this->validar($request);
 
-        return redirect()->route('admin.metodos-pago.index')->with('success', 'Método de pago creado correctamente.');
+        return $this->intentar(
+            fn () => Sp::insertar('sp_metodo_pago_insertar', $datos, 'id_metodo_pago'),
+            'Método de pago creado correctamente.',
+            'admin.metodos-pago.index'
+        );
     }
 
-    // ---------- Formulario de edición ----------
     public function edit($id)
     {
-        return view('modules.admin.metodos-pago.form', ['item' => MetodoPago::findOrFail($id)]);
+        return view('admin.metodos-pago.form', ['item' => MetodoPago::findOrFail($id)]);
     }
 
-    // ---------- Actualizar ----------
     public function update(Request $request, $id)
     {
-        MetodoPago::findOrFail($id)->forceFill($this->validar($request, $id))->save();
+        $datos = ['id_metodo_pago' => (int) $id] + $this->validar($request, $id);
 
-        return redirect()->route('admin.metodos-pago.index')->with('success', 'Método de pago actualizado correctamente.');
+        return $this->intentar(
+            fn () => Sp::ejecutar('sp_metodo_pago_actualizar', $datos),
+            'Método de pago actualizado correctamente.',
+            'admin.metodos-pago.index'
+        );
     }
 
-    // ---------- Eliminar ----------
     public function destroy($id)
     {
-        try {
-            MetodoPago::findOrFail($id)->delete();
-        } catch (QueryException $e) {
-            return back()->with('error', 'No se puede eliminar: el método tiene pagos asociados.');
-        }
-
-        return redirect()->route('admin.metodos-pago.index')->with('success', 'Método de pago eliminado correctamente.');
+        return $this->intentar(
+            fn () => Sp::ejecutar('sp_metodo_pago_eliminar', ['id_metodo_pago' => (int) $id]),
+            'Método de pago eliminado correctamente.',
+            'admin.metodos-pago.index'
+        );
     }
 
-    // ---------- Validación ----------
     private function validar(Request $request, $id = null): array
     {
         return $request->validate([

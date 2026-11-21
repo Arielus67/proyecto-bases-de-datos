@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Factura extends Model
 {
@@ -57,15 +58,21 @@ class Factura extends Model
         );
     }
 
-    public function cajero()
-{
-    return $this->hasOneThrough(
-        Cajero::class,
-        Empleado::class,
-        'id_empleado', // FK en EMPLEADO
-        'id_empleado', // FK en CAJERO
-        'id_empleado', // FK local en FACTURA
-        'id_empleado'  // PK/FK en EMPLEADO
-    );
-}
+    public function cajero(): BelongsTo
+    {
+        return $this->belongsTo(
+            Empleado::class,
+            'id_empleado',
+            'id_empleado'
+        );
+    }
+
+    public function pagos(): HasMany
+    {
+        return $this->hasMany(
+            Pago::class,
+            'id_factura',
+            'id_factura'
+        );
+    }
 }
