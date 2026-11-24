@@ -6,6 +6,9 @@
     $crc = fn ($valor) => '₡' . number_format((float) $valor, 2, ',', ' ');
     $cifra = fn ($valor) => number_format((float) $valor, 2, ',', ' ');
 
+    // Los enlaces solo aparecen si el rol tiene permiso: un rol que solo ve el dashboard no debe toparse con un 403
+    $puedeVerPedidos = \App\Support\Acceso::permite(route('admin.pedidos.index'));
+
     $ventas = collect($ventasPorDia ?? [])->values();
     $totales = $ventas->map(fn ($v) => (float) data_get($v, 'total', 0))->values();
     $fechas = $ventas->map(fn ($v) => \Carbon\Carbon::parse(data_get($v, 'fecha'))->locale('es'));
@@ -81,17 +84,14 @@
             </div>
 
             <nav class="tablero__accesos" aria-label="Accesos rápidos">
-                @if (Route::has('admin.pedidos.index'))
+                @accesible(route('admin.pedidos.index'))
                     <a href="{{ route('admin.pedidos.index') }}" class="acceso-rapido"><i class="ti ti-receipt"></i> Pedidos</a>
                 @endif
-                @if (Route::has('admin.facturas.index'))
+                @accesible(route('admin.facturas.index'))
                     <a href="{{ route('admin.facturas.index') }}" class="acceso-rapido"><i class="ti ti-file-invoice"></i> Facturas</a>
                 @endif
-                @if (Route::has('admin.productos.index'))
+                @accesible(route('admin.productos.index'))
                     <a href="{{ route('admin.productos.index') }}" class="acceso-rapido"><i class="ti ti-soup"></i> Carta</a>
-                @endif
-                @if (Route::has('admin.pedidos.create'))
-                    <a href="{{ route('admin.pedidos.create') }}" class="btn btn--primario"><i class="ti ti-plus"></i> Nuevo pedido</a>
                 @endif
             </nav>
         </header>
@@ -129,7 +129,7 @@
                 </div>
                 <p class="kpi__valor num"><span data-odometro>{{ $pedidosAbiertos }}</span></p>
                 <p class="kpi__nota">{{ $pedidosAbiertos === 1 ? 'Pedido en curso' : 'Pedidos en curso' }}, sin facturar</p>
-                @if (Route::has('admin.pedidos.index'))
+                @accesible(route('admin.pedidos.index'))
                     <a href="{{ route('admin.pedidos.index') }}" class="kpi__enlace">Ver pedidos <i class="ti ti-arrow-right"></i></a>
                 @endif
             </article>
@@ -165,7 +165,7 @@
                 @else
                     <p class="kpi__nota kpi__nota--ok"><i class="ti ti-circle-check"></i> Stock en orden</p>
                 @endif
-                @if (Route::has('admin.alertas.index'))
+                @accesible(route('admin.alertas.index'))
                     <a href="{{ route('admin.alertas.index') }}" class="kpi__enlace">Ver alertas <i class="ti ti-arrow-right"></i></a>
                 @endif
             </article>
@@ -208,7 +208,7 @@
                         <h3 class="panel__titulo" id="titulo-salon">Salón en vivo</h3>
                         <p class="panel__subtitulo">{{ $mesasOcupadas }} ocupadas · {{ max(0, $totalMesas - $mesasOcupadas) }} libres</p>
                     </div>
-                    @if (Route::has('admin.mesas.index'))
+                    @accesible(route('admin.mesas.index'))
                         <a href="{{ route('admin.mesas.index') }}" class="panel__enlace">Mesas <i class="ti ti-arrow-right"></i></a>
                     @endif
                 </header>
@@ -244,7 +244,7 @@
                         <h3 class="panel__titulo" id="titulo-pedidos">Pedidos recientes</h3>
                         <p class="panel__subtitulo">Los últimos {{ $pedidosRecientes->count() }} pedidos registrados</p>
                     </div>
-                    @if (Route::has('admin.pedidos.index'))
+                    @accesible(route('admin.pedidos.index'))
                         <a href="{{ route('admin.pedidos.index') }}" class="panel__enlace">Ver todos <i class="ti ti-arrow-right"></i></a>
                     @endif
                 </header>
@@ -294,9 +294,11 @@
                                     <td class="pedidos__monto num">{{ $crc($pedido->subtotal) }}</td>
                                     <td><span class="estado estado--{{ $estado }}">{{ $estados[$estado] ?? ucfirst(str_replace('_', ' ', $estado)) }}</span></td>
                                     <td>
-                                        <a href="{{ route('admin.pedidos.show', $pedido->id_pedido) }}" class="boton-icono" title="Ver pedido" aria-label="Ver pedido {{ $pedido->id_pedido }}">
-                                            <i class="ti ti-arrow-up-right"></i>
-                                        </a>
+                                        @if ($puedeVerPedidos)
+                                            <a href="{{ route('admin.pedidos.show', $pedido->id_pedido) }}" class="boton-icono" title="Ver pedido" aria-label="Ver pedido {{ $pedido->id_pedido }}">
+                                                <i class="ti ti-arrow-up-right"></i>
+                                            </a>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
@@ -355,7 +357,7 @@
                             <h3 class="panel__titulo" id="titulo-inventario">Inventario por reponer</h3>
                             <p class="panel__subtitulo">Insumos con alerta sin atender</p>
                         </div>
-                        @if (Route::has('admin.insumos.index'))
+                        @accesible(route('admin.insumos.index'))
                             <a href="{{ route('admin.insumos.index') }}" class="panel__enlace">Insumos <i class="ti ti-arrow-right"></i></a>
                         @endif
                     </header>

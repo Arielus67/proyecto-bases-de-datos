@@ -137,6 +137,22 @@ class PermisosTest extends TestCase
         $this->assertStringNotContainsString('title="Eliminar"', $html);
     }
 
+    public function test_un_rol_solo_con_dashboard_lo_ve_sin_enlaces_prohibidos(): void
+    {
+        $this->iniciarSesionComo($this->empleadoConRol('Gerencia', ['dashboard.ver']));
+
+        $respuesta = $this->get(route('admin.dashboard'));
+        $this->assertSame(200, $respuesta->status(), (string) $respuesta->exception);
+        $html = $respuesta->getContent();
+
+        preg_match_all('#href="([^"]+)"#', $html, $enlaces);
+        foreach (array_unique($enlaces[1]) as $url) {
+            if (str_starts_with($url, url('/admin'))) {
+                $this->assertTrue(\App\Support\Acceso::permite($url), "El dashboard enlaza a {$url} sin permiso");
+            }
+        }
+    }
+
     public function test_un_rol_personalizado_entra_a_su_primera_pantalla_permitida(): void
     {
         $this->empleadoConRol('Supervisor de pedidos', ['pedidos.ver', 'facturas.ver']);
