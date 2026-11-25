@@ -82,11 +82,11 @@ El script `1_RestauranteDB_estructura.sql` crea la base `RestauranteDB` si no ex
 
 En SSMS, abra y ejecute **en este orden** los archivos de `database/sql/`:
 
-1. `1_RestauranteDB_estructura.sql`: base de datos, 24 tablas con restricciones nombradas e índices.
+1. `1_RestauranteDB_estructura.sql`: crea la base de datos, las 24 tablas con sus restricciones e índices.
 2. `2_RestauranteDB_programacion.sql`: vistas, triggers, funciones, procedimientos, roles de SQL Server y permisos.
 3. `3_datos_iniciales.sql`: catálogos, menú de ejemplo, catálogo de permisos y un usuario de prueba por rol.
 
-Los tres scripts se pueden ejecutar otra vez sin perder datos. Para **actualizar una base existente** ejecute los tres en el mismo orden. El script 1 renombra las restricciones que SQL Server había nombrado automáticamente y agrega las tablas nuevas. El script 3 crea el catálogo de permisos y asigna los permisos iniciales a los roles Administrador, Mesero, Cocinero y Cajero.
+Los scripts son de **instalación limpia**: se ejecutan una sola vez, en un servidor donde todavía no existe `RestauranteDB`. Para reinstalar, borre antes la base (`DROP DATABASE RestauranteDB`). El script 3 crea el catálogo de permisos y asigna los permisos iniciales a los roles Administrador, Mesero, Cocinero y Cajero. El único objeto que se crea fuera de la base es `sp_restaurar_restaurante`, que vive en `master` y usa `CREATE OR ALTER` para que una reinstalación no falle.
 
 Después cree los índices de MongoDB:
 
@@ -188,7 +188,7 @@ Pruebas automáticas, que no necesitan SQL Server ni MongoDB porque usan una bas
 php artisan test
 ```
 
-Pruebas reales sobre SQL Server: concurrencia, niveles de aislamiento, estrés, respaldos, restauración y fallos. Trabajan sobre una **copia** de la base (`RestauranteDB_Pruebas`) y nunca modifican `RestauranteDB`:
+Pruebas reales sobre SQL Server: concurrencia, niveles de aislamiento, estrés, respaldos, restauración y fallos. Trabajan sobre una base aparte (`RestauranteDB_Pruebas`), que el kit borra y vuelve a crear con los tres scripts. Nunca modifican `RestauranteDB`:
 
 ```bash
 php artisan restaurante:pruebas-sqlserver

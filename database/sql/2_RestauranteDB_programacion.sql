@@ -1,11 +1,16 @@
-USE RestauranteDB
+USE RestauranteDB;
 GO
 
-SET QUOTED_IDENTIFIER ON
-SET ANSI_NULLS ON
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 GO
 
-CREATE OR ALTER VIEW dbo.vw_menu_activo AS
+
+-- =========================================
+-- VISTA vw_menu_activo
+-- =========================================
+
+CREATE VIEW vw_menu_activo AS
 SELECT
     p.id_producto,
     p.nombre_producto,
@@ -20,7 +25,12 @@ INNER JOIN dbo.ESTACION e ON p.id_estacion = e.id_estacion
 WHERE p.activo = 1
 GO
 
-CREATE OR ALTER VIEW dbo.vw_mesas_estado AS
+
+-- =========================================
+-- VISTA vw_mesas_estado
+-- =========================================
+
+CREATE VIEW vw_mesas_estado AS
 SELECT
     m.id_mesa,
     m.numero_mesa,
@@ -34,7 +44,12 @@ FROM dbo.MESA m
 LEFT JOIN dbo.PEDIDO p ON m.id_mesa = p.id_mesa AND p.estado IN ('ABIERTO', 'EN_PREPARACION', 'LISTO', 'ENTREGADO')
 GO
 
-CREATE OR ALTER VIEW dbo.vw_cola_cocina AS
+
+-- =========================================
+-- VISTA vw_cola_cocina
+-- =========================================
+
+CREATE VIEW vw_cola_cocina AS
 SELECT
     dp.id_pedido,
     m.numero_mesa,
@@ -52,7 +67,12 @@ INNER JOIN dbo.MESA m ON ped.id_mesa = m.id_mesa
 WHERE dp.estado_cocina IN ('PENDIENTE', 'PREPARANDO')
 GO
 
-CREATE OR ALTER VIEW dbo.vw_factura_ticket AS
+
+-- =========================================
+-- VISTA vw_factura_ticket
+-- =========================================
+
+CREATE VIEW vw_factura_ticket AS
 SELECT
     f.numero_factura,
     f.fecha_hora,
@@ -71,8 +91,13 @@ INNER JOIN dbo.MESA m ON p.id_mesa = m.id_mesa
 INNER JOIN dbo.EMPLEADO emp ON f.id_empleado = emp.id_empleado
 GO
 
-CREATE OR ALTER TRIGGER dbo.trg_producto_baja_logica
-ON dbo.PRODUCTO
+
+-- =========================================
+-- TRIGGER trg_producto_baja_logica
+-- =========================================
+
+CREATE TRIGGER trg_producto_baja_logica
+ON PRODUCTO
 INSTEAD OF DELETE
 AS
 BEGIN
@@ -105,8 +130,13 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER TRIGGER dbo.trg_factura_no_eliminar
-ON dbo.FACTURA
+
+-- =========================================
+-- TRIGGER trg_factura_no_eliminar
+-- =========================================
+
+CREATE TRIGGER trg_factura_no_eliminar
+ON FACTURA
 INSTEAD OF DELETE
 AS
 BEGIN
@@ -123,8 +153,13 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER TRIGGER dbo.trg_pedido_auditoria
-ON dbo.PEDIDO
+
+-- =========================================
+-- TRIGGER trg_pedido_auditoria
+-- =========================================
+
+CREATE TRIGGER trg_pedido_auditoria
+ON PEDIDO
 AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
@@ -156,8 +191,13 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER TRIGGER dbo.trg_pedido_estado_final
-ON dbo.PEDIDO
+
+-- =========================================
+-- TRIGGER trg_pedido_estado_final
+-- =========================================
+
+CREATE TRIGGER trg_pedido_estado_final
+ON PEDIDO
 AFTER UPDATE
 AS
 BEGIN
@@ -203,8 +243,13 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER TRIGGER dbo.trg_insumo_stock
-ON dbo.INSUMO
+
+-- =========================================
+-- TRIGGER trg_insumo_stock
+-- =========================================
+
+CREATE TRIGGER trg_insumo_stock
+ON INSUMO
 AFTER INSERT, UPDATE
 AS
 BEGIN
@@ -234,8 +279,13 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER TRIGGER dbo.trg_factura_inmutable
-ON dbo.FACTURA
+
+-- =========================================
+-- TRIGGER trg_factura_inmutable
+-- =========================================
+
+CREATE TRIGGER trg_factura_inmutable
+ON FACTURA
 AFTER UPDATE
 AS
 BEGIN
@@ -268,8 +318,13 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER TRIGGER dbo.trg_pago_inmutable
-ON dbo.PAGO
+
+-- =========================================
+-- TRIGGER trg_pago_inmutable
+-- =========================================
+
+CREATE TRIGGER trg_pago_inmutable
+ON PAGO
 AFTER UPDATE, DELETE
 AS
 BEGIN
@@ -286,8 +341,13 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER TRIGGER dbo.trg_turno_caja_cerrado
-ON dbo.TURNO_CAJA
+
+-- =========================================
+-- TRIGGER trg_turno_caja_cerrado
+-- =========================================
+
+CREATE TRIGGER trg_turno_caja_cerrado
+ON TURNO_CAJA
 AFTER UPDATE, DELETE
 AS
 BEGIN
@@ -304,7 +364,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER FUNCTION dbo.fn_tiene_permiso (@id_empleado INT, @clave VARCHAR(60))
+
+-- =========================================
+-- FUNCION fn_tiene_permiso
+-- =========================================
+
+CREATE FUNCTION fn_tiene_permiso (@id_empleado INT, @clave VARCHAR(60))
 RETURNS BIT
 AS
 BEGIN
@@ -318,7 +383,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER VIEW dbo.vw_permisos_empleado AS
+
+-- =========================================
+-- VISTA vw_permisos_empleado
+-- =========================================
+
+CREATE VIEW vw_permisos_empleado AS
 SELECT e.id_empleado, p.clave
 FROM dbo.EMPLEADO e
 INNER JOIN dbo.ROL_PERMISO rp ON rp.id_rol = e.id_rol
@@ -326,7 +396,12 @@ INNER JOIN dbo.PERMISO p ON p.id_permiso = rp.id_permiso
 WHERE e.activo = 1
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_rol_reemplazar_permisos
+
+-- =========================================
+-- PROCEDIMIENTO sp_rol_reemplazar_permisos
+-- =========================================
+
+CREATE PROCEDURE sp_rol_reemplazar_permisos
     @id_rol INT,
     @permisos NVARCHAR(MAX)
 AS
@@ -364,7 +439,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_rol_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_rol_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_rol_insertar
     @nombre_rol VARCHAR(50),
     @permisos NVARCHAR(MAX) = N'[]',
     @id_rol INT OUTPUT
@@ -397,7 +477,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_rol_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_rol_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_rol_actualizar
     @id_rol INT,
     @nombre_rol VARCHAR(50),
     @permisos NVARCHAR(MAX) = NULL
@@ -432,7 +517,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_rol_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_rol_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_rol_eliminar
     @id_rol INT
 AS
 BEGIN
@@ -453,7 +543,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_rol_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_rol_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_rol_consultar
     @id_rol INT = NULL
 AS
 BEGIN
@@ -471,7 +566,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_estacion_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_estacion_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_estacion_insertar
     @nombre_estacion VARCHAR(50),
     @id_estacion INT OUTPUT
 AS
@@ -498,7 +598,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_estacion_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_estacion_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_estacion_actualizar
     @id_estacion INT,
     @nombre_estacion VARCHAR(50)
 AS
@@ -526,7 +631,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_estacion_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_estacion_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_estacion_eliminar
     @id_estacion INT
 AS
 BEGIN
@@ -547,7 +657,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_estacion_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_estacion_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_estacion_consultar
     @id_estacion INT = NULL
 AS
 BEGIN
@@ -563,7 +678,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_categoria_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_categoria_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_categoria_insertar
     @nombre_categoria VARCHAR(50),
     @descripcion VARCHAR(200) = NULL,
     @id_categoria INT OUTPUT
@@ -591,7 +711,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_categoria_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_categoria_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_categoria_actualizar
     @id_categoria INT,
     @nombre_categoria VARCHAR(50),
     @descripcion VARCHAR(200) = NULL
@@ -621,7 +746,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_categoria_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_categoria_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_categoria_eliminar
     @id_categoria INT
 AS
 BEGIN
@@ -642,7 +772,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_categoria_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_categoria_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_categoria_consultar
     @id_categoria INT = NULL
 AS
 BEGIN
@@ -658,7 +793,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_metodo_pago_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_metodo_pago_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_metodo_pago_insertar
     @nombre_metodo VARCHAR(50),
     @id_metodo_pago INT OUTPUT
 AS
@@ -685,7 +825,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_metodo_pago_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_metodo_pago_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_metodo_pago_actualizar
     @id_metodo_pago INT,
     @nombre_metodo VARCHAR(50)
 AS
@@ -713,7 +858,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_metodo_pago_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_metodo_pago_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_metodo_pago_eliminar
     @id_metodo_pago INT
 AS
 BEGIN
@@ -734,7 +884,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_metodo_pago_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_metodo_pago_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_metodo_pago_consultar
     @id_metodo_pago INT = NULL
 AS
 BEGIN
@@ -750,7 +905,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_mesa_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_mesa_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_mesa_insertar
     @numero_mesa INT,
     @capacidad INT,
     @zona VARCHAR(50),
@@ -786,7 +946,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_mesa_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_mesa_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_mesa_actualizar
     @id_mesa INT,
     @numero_mesa INT,
     @capacidad INT,
@@ -826,7 +991,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_mesa_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_mesa_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_mesa_eliminar
     @id_mesa INT
 AS
 BEGIN
@@ -847,7 +1017,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_mesa_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_mesa_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_mesa_consultar
     @id_mesa INT = NULL
 AS
 BEGIN
@@ -863,7 +1038,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_cliente_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_cliente_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_cliente_insertar
     @cedula VARCHAR(20),
     @nombre VARCHAR(50),
     @apellido VARCHAR(50),
@@ -896,7 +1076,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_cliente_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_cliente_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_cliente_actualizar
     @id_cliente INT,
     @cedula VARCHAR(20),
     @nombre VARCHAR(50),
@@ -934,7 +1119,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_cliente_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_cliente_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_cliente_eliminar
     @id_cliente INT
 AS
 BEGIN
@@ -955,7 +1145,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_cliente_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_cliente_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_cliente_consultar
     @id_cliente INT = NULL
 AS
 BEGIN
@@ -971,7 +1166,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_producto_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_producto_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_producto_insertar
     @nombre_producto VARCHAR(100),
     @descripcion VARCHAR(255) = NULL,
     @precio DECIMAL(10,2),
@@ -1010,7 +1210,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_producto_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_producto_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_producto_actualizar
     @id_producto INT,
     @nombre_producto VARCHAR(100),
     @descripcion VARCHAR(255) = NULL,
@@ -1056,7 +1261,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_producto_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_producto_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_producto_eliminar
     @id_producto INT,
     @desactivado BIT OUTPUT
 AS
@@ -1080,7 +1290,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_producto_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_producto_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_producto_consultar
     @id_producto INT = NULL
 AS
 BEGIN
@@ -1096,7 +1311,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_insumo_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_insumo_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_insumo_insertar
     @nombre_insumo VARCHAR(100),
     @unidad_medida VARCHAR(20),
     @stock_actual DECIMAL(10,2),
@@ -1129,7 +1349,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_insumo_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_insumo_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_insumo_actualizar
     @id_insumo INT,
     @nombre_insumo VARCHAR(100),
     @unidad_medida VARCHAR(20),
@@ -1167,7 +1392,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_insumo_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_insumo_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_insumo_eliminar
     @id_insumo INT
 AS
 BEGIN
@@ -1188,7 +1418,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_insumo_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_insumo_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_insumo_consultar
     @id_insumo INT = NULL
 AS
 BEGIN
@@ -1204,7 +1439,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_receta_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_receta_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_receta_insertar
     @id_producto INT,
     @id_insumo INT,
     @cantidad DECIMAL(10,2)
@@ -1234,7 +1474,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_receta_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_receta_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_receta_actualizar
     @id_producto INT,
     @id_insumo INT,
     @cantidad DECIMAL(10,2)
@@ -1267,7 +1512,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_receta_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_receta_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_receta_eliminar
     @id_producto INT,
     @id_insumo INT = NULL
 AS
@@ -1292,7 +1542,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_receta_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_receta_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_receta_consultar
     @id_producto INT = NULL
 AS
 BEGIN
@@ -1310,7 +1565,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_empleado_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_empleado_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_empleado_insertar
     @nombre VARCHAR(50),
     @apellido VARCHAR(50),
     @correo VARCHAR(100),
@@ -1348,7 +1608,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_empleado_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_empleado_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_empleado_actualizar
     @id_empleado INT,
     @nombre VARCHAR(50),
     @apellido VARCHAR(50),
@@ -1394,7 +1659,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_empleado_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_empleado_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_empleado_eliminar
     @id_empleado INT
 AS
 BEGIN
@@ -1418,7 +1688,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_empleado_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_empleado_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_empleado_consultar
     @id_empleado INT = NULL
 AS
 BEGIN
@@ -1434,7 +1709,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_turno_caja_insertar
+
+-- =========================================
+-- PROCEDIMIENTO sp_turno_caja_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_turno_caja_insertar
     @id_empleado INT,
     @monto_inicial DECIMAL(10,2),
     @id_turno INT OUTPUT
@@ -1464,7 +1744,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_turno_caja_actualizar
+
+-- =========================================
+-- PROCEDIMIENTO sp_turno_caja_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_turno_caja_actualizar
     @id_turno INT,
     @id_empleado INT,
     @monto_inicial DECIMAL(10,2),
@@ -1502,7 +1787,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_turno_caja_eliminar
+
+-- =========================================
+-- PROCEDIMIENTO sp_turno_caja_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_turno_caja_eliminar
     @id_turno INT
 AS
 BEGIN
@@ -1523,7 +1813,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_turno_caja_consultar
+
+-- =========================================
+-- PROCEDIMIENTO sp_turno_caja_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_turno_caja_consultar
     @id_turno INT = NULL
 AS
 BEGIN
@@ -1539,7 +1834,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_registrar_pedido
+
+-- =========================================
+-- PROCEDIMIENTO sp_registrar_pedido
+-- =========================================
+
+CREATE PROCEDURE sp_registrar_pedido
     @token_idempotencia VARCHAR(100),
     @id_mesa INT,
     @id_empleado INT,
@@ -1670,7 +1970,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_agregar_items_pedido
+
+-- =========================================
+-- PROCEDIMIENTO sp_agregar_items_pedido
+-- =========================================
+
+CREATE PROCEDURE sp_agregar_items_pedido
     @id_pedido INT,
     @json_lineas NVARCHAR(MAX)
 AS
@@ -1765,7 +2070,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_cobrar_cuenta
+
+-- =========================================
+-- PROCEDIMIENTO sp_cobrar_cuenta
+-- =========================================
+
+CREATE PROCEDURE sp_cobrar_cuenta
     @id_pedido INT,
     @id_cliente INT = NULL,
     @id_cajero INT,
@@ -1870,7 +2180,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_anular_pedido
+
+-- =========================================
+-- PROCEDIMIENTO sp_anular_pedido
+-- =========================================
+
+CREATE PROCEDURE sp_anular_pedido
     @id_pedido INT,
     @id_empleado INT,
     @motivo VARCHAR(255)
@@ -1936,7 +2251,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_reporte_ventas
+
+-- =========================================
+-- PROCEDIMIENTO sp_reporte_ventas
+-- =========================================
+
+CREATE PROCEDURE sp_reporte_ventas
     @fecha_inicio DATETIME,
     @fecha_fin DATETIME,
     @agrupar_por VARCHAR(20)
@@ -2034,7 +2354,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_respaldar_bd
+
+-- =========================================
+-- PROCEDIMIENTO sp_respaldar_bd
+-- =========================================
+
+CREATE PROCEDURE sp_respaldar_bd
     @ruta NVARCHAR(260),
     @id_empleado INT = NULL,
     @id_respaldo INT OUTPUT,
@@ -2093,7 +2418,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_verificar_respaldo
+
+-- =========================================
+-- PROCEDIMIENTO sp_verificar_respaldo
+-- =========================================
+
+CREATE PROCEDURE sp_verificar_respaldo
     @id_respaldo INT
 AS
 BEGIN
@@ -2131,7 +2461,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_sesion_abrir
+
+-- =========================================
+-- PROCEDIMIENTO sp_sesion_abrir
+-- =========================================
+
+CREATE PROCEDURE sp_sesion_abrir
     @id_empleado INT,
     @token CHAR(64),
     @direccion_ip VARCHAR(45) = NULL,
@@ -2169,7 +2504,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_sesion_validar
+
+-- =========================================
+-- PROCEDIMIENTO sp_sesion_validar
+-- =========================================
+
+CREATE PROCEDURE sp_sesion_validar
     @id_empleado INT,
     @token CHAR(64),
     @vigente BIT OUTPUT
@@ -2190,7 +2530,12 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_sesion_cerrar
+
+-- =========================================
+-- PROCEDIMIENTO sp_sesion_cerrar
+-- =========================================
+
+CREATE PROCEDURE sp_sesion_cerrar
     @id_empleado INT,
     @token CHAR(64) = NULL
 AS
@@ -2203,76 +2548,102 @@ BEGIN
 END
 GO
 
-IF DATABASE_PRINCIPAL_ID(N'rol_administrador') IS NULL CREATE ROLE rol_administrador
-IF DATABASE_PRINCIPAL_ID(N'rol_mesero') IS NULL CREATE ROLE rol_mesero
-IF DATABASE_PRINCIPAL_ID(N'rol_cocinero') IS NULL CREATE ROLE rol_cocinero
-IF DATABASE_PRINCIPAL_ID(N'rol_cajero') IS NULL CREATE ROLE rol_cajero
+
+-- =========================================
+-- ROLES DE SQL SERVER
+-- =========================================
+
+CREATE ROLE rol_administrador;
+CREATE ROLE rol_mesero;
+CREATE ROLE rol_cocinero;
+CREATE ROLE rol_cajero;
 GO
 
-GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON SCHEMA::dbo TO rol_administrador
-GRANT BACKUP DATABASE TO rol_administrador
 
-GRANT SELECT ON dbo.MESA TO rol_mesero
-GRANT SELECT ON dbo.PRODUCTO TO rol_mesero
-GRANT SELECT ON dbo.CATEGORIA TO rol_mesero
-GRANT SELECT ON dbo.PEDIDO TO rol_mesero
-GRANT SELECT ON dbo.DETALLE_PEDIDO TO rol_mesero
-GRANT SELECT ON dbo.vw_menu_activo TO rol_mesero
-GRANT SELECT ON dbo.vw_mesas_estado TO rol_mesero
-GRANT UPDATE (estado) ON dbo.PEDIDO TO rol_mesero
-GRANT UPDATE (estado_cocina, fecha_actualizacion) ON dbo.DETALLE_PEDIDO TO rol_mesero
-GRANT EXECUTE ON dbo.sp_registrar_pedido TO rol_mesero
-GRANT EXECUTE ON dbo.sp_agregar_items_pedido TO rol_mesero
+-- =========================================
+-- PERMISOS DE CADA ROL
+-- =========================================
 
-GRANT SELECT ON dbo.PEDIDO TO rol_cocinero
-GRANT SELECT ON dbo.DETALLE_PEDIDO TO rol_cocinero
-GRANT SELECT ON dbo.PRODUCTO TO rol_cocinero
-GRANT SELECT ON dbo.MESA TO rol_cocinero
-GRANT SELECT ON dbo.vw_cola_cocina TO rol_cocinero
-GRANT UPDATE (estado) ON dbo.PEDIDO TO rol_cocinero
-GRANT UPDATE (estado_cocina, fecha_actualizacion) ON dbo.DETALLE_PEDIDO TO rol_cocinero
+GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON SCHEMA::dbo TO rol_administrador;
+GRANT BACKUP DATABASE TO rol_administrador;
 
-GRANT SELECT ON dbo.PEDIDO TO rol_cajero
-GRANT SELECT ON dbo.DETALLE_PEDIDO TO rol_cajero
-GRANT SELECT ON dbo.PRODUCTO TO rol_cajero
-GRANT SELECT ON dbo.MESA TO rol_cajero
-GRANT SELECT ON dbo.METODO_PAGO TO rol_cajero
-GRANT SELECT ON dbo.FACTURA TO rol_cajero
-GRANT SELECT ON dbo.PAGO TO rol_cajero
-GRANT SELECT ON dbo.TURNO_CAJA TO rol_cajero
-GRANT SELECT ON dbo.CAJERO TO rol_cajero
-GRANT SELECT (id_cliente, nombre, apellido) ON dbo.CLIENTE TO rol_cajero
-GRANT SELECT (id_empleado, nombre, apellido) ON dbo.EMPLEADO TO rol_cajero
-GRANT SELECT ON dbo.vw_mesas_estado TO rol_cajero
-GRANT SELECT ON dbo.vw_factura_ticket TO rol_cajero
-GRANT UPDATE (fecha_cierre, monto_final) ON dbo.TURNO_CAJA TO rol_cajero
-GRANT EXECUTE ON dbo.sp_turno_caja_insertar TO rol_cajero
-GRANT EXECUTE ON dbo.sp_cobrar_cuenta TO rol_cajero
-GRANT EXECUTE ON dbo.sp_anular_pedido TO rol_cajero
+GRANT SELECT ON dbo.MESA TO rol_mesero;
+GRANT SELECT ON dbo.PRODUCTO TO rol_mesero;
+GRANT SELECT ON dbo.CATEGORIA TO rol_mesero;
+GRANT SELECT ON dbo.PEDIDO TO rol_mesero;
+GRANT SELECT ON dbo.DETALLE_PEDIDO TO rol_mesero;
+GRANT SELECT ON dbo.vw_menu_activo TO rol_mesero;
+GRANT SELECT ON dbo.vw_mesas_estado TO rol_mesero;
+GRANT UPDATE (estado) ON dbo.PEDIDO TO rol_mesero;
+GRANT UPDATE (estado_cocina, fecha_actualizacion) ON dbo.DETALLE_PEDIDO TO rol_mesero;
+GRANT EXECUTE ON dbo.sp_registrar_pedido TO rol_mesero;
+GRANT EXECUTE ON dbo.sp_agregar_items_pedido TO rol_mesero;
 
-GRANT SELECT ON dbo.vw_permisos_empleado TO rol_mesero, rol_cocinero, rol_cajero
-GRANT EXECUTE ON dbo.sp_sesion_validar TO rol_mesero, rol_cocinero, rol_cajero
-GRANT EXECUTE ON dbo.sp_sesion_cerrar TO rol_mesero, rol_cocinero, rol_cajero
+GRANT SELECT ON dbo.PEDIDO TO rol_cocinero;
+GRANT SELECT ON dbo.DETALLE_PEDIDO TO rol_cocinero;
+GRANT SELECT ON dbo.PRODUCTO TO rol_cocinero;
+GRANT SELECT ON dbo.MESA TO rol_cocinero;
+GRANT SELECT ON dbo.vw_cola_cocina TO rol_cocinero;
+GRANT UPDATE (estado) ON dbo.PEDIDO TO rol_cocinero;
+GRANT UPDATE (estado_cocina, fecha_actualizacion) ON dbo.DETALLE_PEDIDO TO rol_cocinero;
 
-DENY UPDATE, DELETE ON dbo.AUDITORIA_PEDIDO TO rol_administrador
-DENY UPDATE, DELETE ON dbo.AUDITORIA_PEDIDO TO rol_mesero
-DENY UPDATE, DELETE ON dbo.AUDITORIA_PEDIDO TO rol_cocinero
-DENY UPDATE, DELETE ON dbo.AUDITORIA_PEDIDO TO rol_cajero
+GRANT SELECT ON dbo.PEDIDO TO rol_cajero;
+GRANT SELECT ON dbo.DETALLE_PEDIDO TO rol_cajero;
+GRANT SELECT ON dbo.PRODUCTO TO rol_cajero;
+GRANT SELECT ON dbo.MESA TO rol_cajero;
+GRANT SELECT ON dbo.METODO_PAGO TO rol_cajero;
+GRANT SELECT ON dbo.FACTURA TO rol_cajero;
+GRANT SELECT ON dbo.PAGO TO rol_cajero;
+GRANT SELECT ON dbo.TURNO_CAJA TO rol_cajero;
+GRANT SELECT ON dbo.CAJERO TO rol_cajero;
+GRANT SELECT (id_cliente, nombre, apellido) ON dbo.CLIENTE TO rol_cajero;
+GRANT SELECT (id_empleado, nombre, apellido) ON dbo.EMPLEADO TO rol_cajero;
+GRANT SELECT ON dbo.vw_mesas_estado TO rol_cajero;
+GRANT SELECT ON dbo.vw_factura_ticket TO rol_cajero;
+GRANT UPDATE (fecha_cierre, monto_final) ON dbo.TURNO_CAJA TO rol_cajero;
+GRANT EXECUTE ON dbo.sp_turno_caja_insertar TO rol_cajero;
+GRANT EXECUTE ON dbo.sp_cobrar_cuenta TO rol_cajero;
+GRANT EXECUTE ON dbo.sp_anular_pedido TO rol_cajero;
+
+GRANT SELECT ON dbo.vw_permisos_empleado TO rol_mesero, rol_cocinero, rol_cajero;
+GRANT EXECUTE ON dbo.sp_sesion_validar TO rol_mesero, rol_cocinero, rol_cajero;
+GRANT EXECUTE ON dbo.sp_sesion_cerrar TO rol_mesero, rol_cocinero, rol_cajero;
+
+DENY UPDATE, DELETE ON dbo.AUDITORIA_PEDIDO TO rol_administrador;
+DENY UPDATE, DELETE ON dbo.AUDITORIA_PEDIDO TO rol_mesero;
+DENY UPDATE, DELETE ON dbo.AUDITORIA_PEDIDO TO rol_cocinero;
+DENY UPDATE, DELETE ON dbo.AUDITORIA_PEDIDO TO rol_cajero;
 GO
 
-IF DATABASE_PRINCIPAL_ID(N'app_administrador') IS NULL CREATE USER app_administrador WITHOUT LOGIN
-IF DATABASE_PRINCIPAL_ID(N'app_mesero') IS NULL CREATE USER app_mesero WITHOUT LOGIN
-IF DATABASE_PRINCIPAL_ID(N'app_cocinero') IS NULL CREATE USER app_cocinero WITHOUT LOGIN
-IF DATABASE_PRINCIPAL_ID(N'app_cajero') IS NULL CREATE USER app_cajero WITHOUT LOGIN
+
+-- =========================================
+-- USUARIOS DE LA APLICACION
+-- =========================================
+
+CREATE USER app_administrador WITHOUT LOGIN;
+CREATE USER app_mesero WITHOUT LOGIN;
+CREATE USER app_cocinero WITHOUT LOGIN;
+CREATE USER app_cajero WITHOUT LOGIN;
 GO
 
-IF IS_ROLEMEMBER(N'rol_administrador', N'app_administrador') = 0 ALTER ROLE rol_administrador ADD MEMBER app_administrador
-IF IS_ROLEMEMBER(N'rol_mesero', N'app_mesero') = 0 ALTER ROLE rol_mesero ADD MEMBER app_mesero
-IF IS_ROLEMEMBER(N'rol_cocinero', N'app_cocinero') = 0 ALTER ROLE rol_cocinero ADD MEMBER app_cocinero
-IF IS_ROLEMEMBER(N'rol_cajero', N'app_cajero') = 0 ALTER ROLE rol_cajero ADD MEMBER app_cajero
+
+-- =========================================
+-- MIEMBROS DE CADA ROL
+-- =========================================
+
+ALTER ROLE rol_administrador ADD MEMBER app_administrador;
+ALTER ROLE rol_mesero ADD MEMBER app_mesero;
+ALTER ROLE rol_cocinero ADD MEMBER app_cocinero;
+ALTER ROLE rol_cajero ADD MEMBER app_cajero;
 GO
 
-USE master
+
+-- =========================================
+-- PROCEDIMIENTO sp_restaurar_restaurante (base master)
+-- Lleva CREATE OR ALTER porque vive en master y no se borra junto con RestauranteDB
+-- =========================================
+
+USE master;
 GO
 
 CREATE OR ALTER PROCEDURE dbo.sp_restaurar_restaurante
@@ -2322,8 +2693,8 @@ BEGIN
 END
 GO
 
-USE RestauranteDB
+USE RestauranteDB;
 GO
 
-PRINT N'Programación lista. Si la base está vacía, ejecute ahora 3_datos_iniciales.sql.'
+PRINT N'Programación lista. Ahora ejecute 3_datos_iniciales.sql.';
 GO

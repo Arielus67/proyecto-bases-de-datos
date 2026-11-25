@@ -178,11 +178,11 @@ class SesionUnicaTest extends TestCase
         $estructura = file_get_contents($archivoEstructura);
         $programacion = file_get_contents($archivoProgramacion);
 
-        $this->assertStringContainsString('CREATE TABLE dbo.SESION_ACTIVA', $estructura);
-        $this->assertMatchesRegularExpression('/id_empleado\s+INT NOT NULL CONSTRAINT UQ_SESION_ACTIVA_id_empleado UNIQUE/', $estructura);
+        $this->assertStringContainsString('CREATE TABLE SESION_ACTIVA', $estructura);
+        $this->assertMatchesRegularExpression('/id_empleado\s+INT UNIQUE NOT NULL/', $estructura);
 
         foreach (['sp_sesion_abrir', 'sp_sesion_validar', 'sp_sesion_cerrar'] as $procedimiento) {
-            $this->assertStringContainsString('CREATE OR ALTER PROCEDURE dbo.' . $procedimiento, $programacion);
+            $this->assertStringContainsString('CREATE PROCEDURE ' . $procedimiento, $programacion);
         }
     }
 }

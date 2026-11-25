@@ -108,7 +108,7 @@ trait EsquemaSqlite
     protected function catalogoPermisos(): array
     {
         $sql = file_get_contents(base_path('database/sql/3_datos_iniciales.sql'));
-        preg_match('/INSERT INTO dbo\.PERMISO.*?\) v\(clave/s', $sql, $bloque);
+        preg_match('/INSERT INTO PERMISO.*?;/s', $sql, $bloque);
         preg_match_all("/\('([a-z_]+\.[a-z]+)', '([^']+)', '([^']+)'\)/u", $bloque[0], $filas, PREG_SET_ORDER);
 
         return array_map(fn ($fila) => ['clave' => $fila[1], 'modulo' => $fila[2], 'descripcion' => $fila[3]], $filas);

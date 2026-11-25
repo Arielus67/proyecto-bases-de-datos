@@ -25,12 +25,16 @@ class ScriptsSqlTest extends TestCase
     }
 
     #[DataProvider('scripts')]
-    public function test_los_scripts_no_tienen_comentarios(string $archivo): void
+    public function test_los_scripts_crean_los_objetos_sin_validar_si_existen(string $archivo): void
     {
-        foreach ($this->lineas($archivo) as $numero => $linea) {
-            $this->assertStringNotContainsString('--', $linea, "{$archivo}:" . ($numero + 1));
-            $this->assertStringNotContainsString('/*', $linea, "{$archivo}:" . ($numero + 1));
-        }
+        $texto = implode("
+", $this->lineas($archivo));
+
+        $this->assertDoesNotMatchRegularExpression('/(OBJECT_ID|DB_ID|DATABASE_PRINCIPAL_ID|IS_ROLEMEMBER|COL_LENGTH)\s*\(/i', preg_replace('/^CREATE (PROCEDURE|FUNCTION|TRIGGER|VIEW).*?^GO$/ms', '', $texto));
+        $this->assertSame(
+            $archivo === '2_RestauranteDB_programacion.sql' ? ['sp_restaurar_restaurante'] : [],
+            preg_match_all('/CREATE OR ALTER PROCEDURE dbo\.(\w+)/', $texto, $m) ? $m[1] : []
+        );
     }
 
     #[DataProvider('scripts')]
@@ -55,32 +59,26 @@ class ScriptsSqlTest extends TestCase
         $this->assertNotEmpty($codigo);
     }
 
-    public function test_todas_las_restricciones_de_las_tablas_tienen_nombre(): void
+    public function test_las_llaves_foraneas_tienen_nombre_y_no_se_repiten(): void
     {
-        $sinNombre = [];
+        $texto = implode("
+", $this->lineas('1_RestauranteDB_estructura.sql'));
 
-        foreach ($this->lineas('1_RestauranteDB_estructura.sql') as $numero => $linea) {
-            if (preg_match('/^\s*(IF|CREATE (UNIQUE )?INDEX|WHERE)\b/i', $linea)) {
-                continue;
-            }
+        preg_match_all('/CONSTRAINT (\w+)\s+FOREIGN KEY/', $texto, $nombradas);
+        $this->assertSame(substr_count($texto, 'FOREIGN KEY'), count($nombradas[1]));
+        $this->assertSame(substr_count($texto, 'REFERENCES'), count($nombradas[1]));
+        $this->assertNotEmpty($nombradas[1]);
 
-            $total = preg_match_all('/\b(PRIMARY KEY|UNIQUE|REFERENCES|CHECK|DEFAULT)\b/', $linea);
-            $nombradas = preg_match_all('/CONSTRAINT \w+ (PRIMARY KEY|UNIQUE|REFERENCES|CHECK|DEFAULT)\b/', $linea);
-
-            if ($total !== $nombradas) {
-                $sinNombre[] = ($numero + 1) . ': ' . trim($linea);
-            }
-        }
-
-        $this->assertSame([], $sinNombre);
+        $repetidos = array_keys(array_filter(array_count_values(array_map('strtoupper', $nombradas[1])), fn ($n) => $n > 1));
+        $this->assertSame([], $repetidos);
     }
 
-    public function test_los_nombres_de_restricciones_no_se_repiten_sin_distinguir_mayusculas(): void
+    public function test_se_conservan_los_indices_que_usa_la_aplicacion(): void
     {
-        preg_match_all('/CONSTRAINT (\w+) (?:PRIMARY KEY|UNIQUE|REFERENCES|CHECK|DEFAULT|FOREIGN KEY)\b/i', implode("\n", $this->lineas('1_RestauranteDB_estructura.sql')), $coincidencias);
-        $repetidos = array_keys(array_filter(array_count_values(array_map('strtoupper', $coincidencias[1])), fn ($n) => $n > 1));
+        $texto = implode("
+", $this->lineas('1_RestauranteDB_estructura.sql'));
 
-        $this->assertNotEmpty($coincidencias[1]);
-        $this->assertSame([], $repetidos);
+        $this->assertMatchesRegularExpression('/CREATE UNIQUE INDEX UQ_TURNO_CAJA_Abierto ON TURNO_CAJA \(id_empleado\)\s+WHERE fecha_cierre IS NULL;/', $texto);
+        $this->assertStringContainsString('CREATE UNIQUE INDEX UQ_PEDIDO_MesaAbierta ON PEDIDO (id_mesa)', $texto);
     }
 }

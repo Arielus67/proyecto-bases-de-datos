@@ -103,14 +103,12 @@ class PruebasSqlServer extends Command
 
     private function preparar(): void
     {
-        $carpeta = $this->carpeta();
-        $copia = $carpeta . 'copia_para_pruebas_' . date('Ymd_His') . '.bak';
+        if ($this->valor(self::MASTER, 'SELECT DB_ID(?)', [$this->base]) !== null) {
+            $this->lote(self::MASTER, 'ALTER DATABASE ' . $this->nombre($this->base) . ' SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE ' . $this->nombre($this->base));
+        }
 
-        $this->lote(self::MASTER, 'BACKUP DATABASE ' . $this->nombre($this->principal) . ' TO DISK = ? WITH COPY_ONLY, INIT, CHECKSUM', [$copia]);
-        $this->anotar('preparar', 'Respaldo COPY_ONLY de la base principal (no altera su cadena de respaldos)', 'archivo creado', $copia, true);
-
-        $this->restaurarComo($copia, $this->base);
-        $this->anotar('preparar', 'Copia restaurada como base independiente', $this->base, 'restaurada', true);
+        DB::purge(self::PRUEBAS);
+        $this->anotar('preparar', 'Base de pruebas anterior eliminada (los scripts son de instalación limpia)', $this->base, 'sin base previa', true);
 
         foreach (['1_RestauranteDB_estructura.sql', '2_RestauranteDB_programacion.sql', '3_datos_iniciales.sql'] as $script) {
             $errores = $this->ejecutarScript(base_path('database/sql/' . $script));
@@ -855,7 +853,7 @@ class PruebasSqlServer extends Command
         $nombre = 'informe-sqlserver-' . date('Ymd-His');
         file_put_contents("{$carpeta}/{$nombre}.json", json_encode(['fecha' => date('c'), 'base' => $this->base, 'servidor' => config('database.connections.sqlsrv.host'), 'version' => $this->valor(self::MASTER, 'SELECT @@VERSION'), 'resultados' => $this->resultados, 'estres' => $this->estres], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-        $md = ['# Pruebas en SQL Server — ' . config('app.name'), '', '- Fecha: ' . date('Y-m-d H:i'), '- Base de pruebas: ' . $this->base . ' (copia de ' . $this->principal . ')', '- Duración: ' . round($segundos) . ' s', '', '| Fase | Prueba | Esperado | Obtenido | Resultado |', '|---|---|---|---|---|'];
+        $md = ['# Pruebas en SQL Server — ' . config('app.name'), '', '- Fecha: ' . date('Y-m-d H:i'), '- Base de pruebas: ' . $this->base . ' (creada desde cero con los 3 scripts)', '- Duración: ' . round($segundos) . ' s', '', '| Fase | Prueba | Esperado | Obtenido | Resultado |', '|---|---|---|---|---|'];
         foreach ($this->resultados as $r) {
             $md[] = '| ' . implode(' | ', [$r['fase'], $r['prueba'], $r['esperado'], str_replace('|', '/', $r['obtenido']), $r['ok'] === null ? 'Pendiente' : ($r['ok'] ? 'Aprobada' : 'Fallida')]) . ' |';
         }
