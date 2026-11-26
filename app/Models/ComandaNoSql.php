@@ -26,7 +26,8 @@ class ComandaNoSql extends Model
         'detalles_con_modificadores', // Modificadores libres, notas y alérgenos (cada línea lleva su "ronda")
         'tiempos_cocina',
         'ronda_actual', // Número de la ronda que cocina debe preparar ahora
-        'ronda_at',     // Hora en que se envió la ronda actual
+        'ronda_at',     // Hora en que se envió la ronda pendiente más antigua
+        'ronda_lista',  // Última ronda que cocina ya marcó como LISTO (0 = ninguna)
     ];
 
     protected $casts = [
@@ -36,6 +37,20 @@ class ComandaNoSql extends Model
     public static function llaveBloqueo(int $idPedido): string
     {
         return 'comanda-mongo-' . $idPedido;
+    }
+
+    /**
+     * Líneas que cocina todavía debe preparar: todas las rondas posteriores a la última marcada
+     * como LISTO. Si un segundo mesero agrega productos antes de que cocina termine la ronda
+     * anterior, las dos rondas siguen visibles (antes solo se veía la última).
+     */
+    public function lineasPendientes(): \Illuminate\Support\Collection
+    {
+        $lista = (int) ($this->ronda_lista ?? 0);
+
+        return collect($this->detalles_con_modificadores ?? [])
+            ->filter(fn ($d) => (int) ($d['ronda'] ?? 1) > $lista)
+            ->values();
     }
 
     /** Pedido de SQL Server con los datos que identifican su comanda. */

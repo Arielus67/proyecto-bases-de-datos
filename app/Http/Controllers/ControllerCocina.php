@@ -165,6 +165,8 @@ class ControllerCocina extends Controller
                 $tiempos['preparando_at'] = now();
             } else {
                 $tiempos['listo_at'] = now();
+                // En SQL todas las líneas pendientes pasaron a LISTO: ninguna ronda queda en cocina
+                $comandaMongo->ronda_lista = (int) ($comandaMongo->ronda_actual ?? 1);
             }
             $comandaMongo->tiempos_cocina = $tiempos;
             $comandaMongo->save();
@@ -320,6 +322,7 @@ class ControllerCocina extends Controller
                 ->values()
                 ->all();
             $comanda->estado = $p->estado;
+            $comanda->ronda_lista = $ronda - 1;
             $comanda->ronda_actual = $ronda;
             $comanda->ronda_at = now();
             $comanda->save();

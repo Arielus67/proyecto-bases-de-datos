@@ -151,6 +151,59 @@ class ComandasMongoTest extends TestCase
         $this->assertSame(2, (int) $comanda->detalles_con_modificadores[0]['cantidad']);
     }
 
+    /** Crea la comanda (ronda 1, mesero A) y le suma una ronda (mesero B) como hace ControllerMesa. */
+    private function pedidoConDosRondas(): int
+    {
+        $id = $this->crearPedido('token-dos-meseros');
+        $mesa = app(ControllerMesa::class);
+
+        (new \ReflectionMethod(ControllerMesa::class, 'crearComanda'))->invoke($mesa, $id, [
+            'token_idempotencia' => 'token-dos-meseros', 'id_mesa' => 1, 'id_empleado' => $this->idMesero,
+            'detalles' => [['num_linea' => 1, 'id_producto' => 1, 'cantidad' => 2, 'notas' => 'PEDIDO-MESERO-A']],
+        ]);
+
+        return $id;
+    }
+
+    private function ampliar(int $id, string $nota): void
+    {
+        (new \ReflectionMethod(ControllerMesa::class, 'ampliarComanda'))->invoke(app(ControllerMesa::class), $id, [
+            ['id_producto' => 1, 'cantidad' => 1, 'notas' => $nota],
+        ]);
+    }
+
+    public function test_segundo_mesero_agrega_y_cocina_sigue_viendo_lo_del_primero(): void
+    {
+        $id = $this->pedidoConDosRondas();
+        $this->ampliar($id, 'PEDIDO-MESERO-B');
+
+        $comanda = ComandaNoSql::where('id_pedido_sql', $id)->first();
+        $this->assertSame(2, (int) $comanda->ronda_actual);
+        $this->assertCount(2, $comanda->lineasPendientes(), 'La ronda 1 desapareció de cocina.');
+
+        $this->iniciarSesionComo($this->idCocinero);
+        $this->get(route('cocina.index'))->assertOk()
+            ->assertSee('PEDIDO-MESERO-A')
+            ->assertSee('PEDIDO-MESERO-B')
+            ->assertSee('Rondas 1–2');
+    }
+
+    public function test_si_cocina_ya_termino_la_ronda_anterior_solo_muestra_la_nueva(): void
+    {
+        $id = $this->pedidoConDosRondas();
+
+        $comanda = ComandaNoSql::where('id_pedido_sql', $id)->first();
+        $comanda->estado = 'LISTO';
+        $comanda->ronda_lista = 1;
+        $comanda->save();
+
+        $this->ampliar($id, 'PEDIDO-MESERO-B');
+
+        $lineas = ComandaNoSql::where('id_pedido_sql', $id)->first()->lineasPendientes();
+        $this->assertCount(1, $lineas);
+        $this->assertSame('PEDIDO-MESERO-B', $lineas->first()['notas']);
+    }
+
     public function test_comanda_activa_de_un_pedido_ya_facturado_deja_de_mostrarse(): void
     {
         $id = $this->crearPedido('token-actual', 'FACTURADO');

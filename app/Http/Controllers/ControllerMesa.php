@@ -341,7 +341,8 @@ class ControllerMesa extends Controller
             return;
         }
 
-        $ronda = ((int) ($comanda->ronda_actual ?? 1)) + 1;
+        $rondaAnterior = (int) ($comanda->ronda_actual ?? 1);
+        $ronda = $rondaAnterior + 1;
 
         $nuevas = collect($lineas)->map(fn ($l) => $l + ['ronda' => $ronda])->all();
 
@@ -350,14 +351,25 @@ class ControllerMesa extends Controller
             ->values()
             ->all();
 
+        // ¿Cocina ya terminó lo anterior? Si la comanda sigue ABIERTO / EN_PREPARACION, las rondas
+        // previas siguen pendientes y deben seguir en pantalla junto con la nueva.
+        $anteriorPendiente = in_array($comanda->estado, ComandaNoSql::ESTADOS_COCINA, true);
+
+        if ($anteriorPendiente) {
+            // Se conserva la hora de la ronda pendiente más antigua (el tiempo de espera es real)
+            $comanda->ronda_lista = (int) ($comanda->ronda_lista ?? 0);
+        } else {
+            $comanda->ronda_lista = $rondaAnterior;
+            $comanda->ronda_at = now();
+            $comanda->tiempos_cocina = [
+                'enviado_at' => now(),
+                'preparando_at' => null,
+                'listo_at' => null,
+            ];
+        }
+
         $comanda->estado = 'ABIERTO';
         $comanda->ronda_actual = $ronda;
-        $comanda->ronda_at = now();
-        $comanda->tiempos_cocina = [
-            'enviado_at' => now(),
-            'preparando_at' => null,
-            'listo_at' => null,
-        ];
         $comanda->save();
 
         BitacoraEventoNoSql::create([

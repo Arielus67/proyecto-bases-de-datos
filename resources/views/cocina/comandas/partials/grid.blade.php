@@ -10,9 +10,13 @@
         $claseCard = $esAbierto ? 'estado-abierto' : 'estado-preparacion';
         $claseBadge = $esAbierto ? 'badge-abierto' : 'badge-preparacion';
 
-        $ronda = $comanda->ronda_actual ?? 1;
-        $lineas = collect($comanda->detalles_con_modificadores)
-            ->filter(fn ($d) => ($d['ronda'] ?? 1) == $ronda);
+        // Todas las rondas que cocina aún no terminó (no solo la última)
+        $lineas = $comanda->lineasPendientes();
+        $rondas = $lineas->map(fn ($d) => (int) ($d['ronda'] ?? 1))->unique()->sort()->values();
+        $variasRondas = $rondas->count() > 1;
+        $etiquetaRonda = $variasRondas
+            ? 'Rondas ' . $rondas->first() . '–' . $rondas->last()
+            : (($rondas->first() ?? 1) > 1 ? 'Ronda ' . $rondas->first() : null);
         $horaEnvio = $comanda->ronda_at ?? $comanda->created_at;
         $minutos = (int) $horaEnvio->diffInMinutes(now());
         $claseTiempo = $minutos >= 20 ? 'kds-hora--critica' : ($minutos >= 10 ? 'kds-hora--atencion' : '');
@@ -41,8 +45,8 @@
                     <span class="kds-badge {{ $claseBadge }}">
                         {{ str_replace('_', ' ', $comanda->estado) }}
                     </span>
-                    @if ($ronda > 1)
-                        <span class="kds-ronda">Ronda {{ $ronda }}</span>
+                    @if ($etiquetaRonda)
+                        <span class="kds-ronda">{{ $etiquetaRonda }}</span>
                     @endif
                 </div>
                 <span class="kds-hora num {{ $claseTiempo }}">
@@ -58,7 +62,12 @@
                 @foreach ($lineas as $detalle)
                     <li class="kds-item">
                         <div class="kds-item-fila">
-                            <span>{{ $nombresProductos[$detalle['id_producto']] ?? 'Producto #' . $detalle['id_producto'] }}</span>
+                            <span>
+                                @if ($variasRondas)
+                                    <span class="kds-ronda">R{{ $detalle['ronda'] ?? 1 }}</span>
+                                @endif
+                                {{ $nombresProductos[$detalle['id_producto']] ?? 'Producto #' . $detalle['id_producto'] }}
+                            </span>
                             <span class="kds-cantidad">x{{ $detalle['cantidad'] }}</span>
                         </div>
 
