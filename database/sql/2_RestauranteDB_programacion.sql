@@ -169,17 +169,17 @@ BEGIN
         DECLARE @actor INT = TRY_CAST(SESSION_CONTEXT(N'id_empleado') AS INT)
         DECLARE @usuario VARCHAR(100) = COALESCE(CAST(SESSION_CONTEXT(N'usuario_app') AS VARCHAR(100)), SUSER_SNAME())
 
-        INSERT INTO dbo.AUDITORIA_PEDIDO (id_pedido, accion, usuario_bd, id_empleado_app, estado_nuevo, subtotal_nuevo)
+        INSERT INTO dbo.AUDITORIA_PEDIDO (id_pedido, accion, usuario_bd, id_empleado, estado_nuevo, subtotal_nuevo)
         SELECT i.id_pedido, 'INSERT', @usuario, COALESCE(@actor, i.id_empleado), i.estado, i.subtotal
         FROM inserted i
         WHERE NOT EXISTS (SELECT 1 FROM deleted d WHERE d.id_pedido = i.id_pedido)
 
-        INSERT INTO dbo.AUDITORIA_PEDIDO (id_pedido, accion, usuario_bd, id_empleado_app, estado_anterior, estado_nuevo, subtotal_anterior, subtotal_nuevo)
+        INSERT INTO dbo.AUDITORIA_PEDIDO (id_pedido, accion, usuario_bd, id_empleado, estado_anterior, estado_nuevo, subtotal_anterior, subtotal_nuevo)
         SELECT i.id_pedido, 'UPDATE', @usuario, COALESCE(@actor, i.id_empleado), d.estado, i.estado, d.subtotal, i.subtotal
         FROM inserted i
         INNER JOIN deleted d ON i.id_pedido = d.id_pedido
 
-        INSERT INTO dbo.AUDITORIA_PEDIDO (id_pedido, accion, usuario_bd, id_empleado_app, estado_anterior, subtotal_anterior)
+        INSERT INTO dbo.AUDITORIA_PEDIDO (id_pedido, accion, usuario_bd, id_empleado, estado_anterior, subtotal_anterior)
         SELECT d.id_pedido, 'DELETE', @usuario, COALESCE(@actor, d.id_empleado), d.estado, d.subtotal
         FROM deleted d
         WHERE NOT EXISTS (SELECT 1 FROM inserted i WHERE i.id_pedido = d.id_pedido)
@@ -385,6 +385,23 @@ GO
 
 
 -- =========================================
+-- VISTA vw_cliente
+-- Devuelve la cédula descifrada. DECRYPTBYKEYAUTOCERT abre la llave con el
+-- certificado: quien no tenga permiso sobre el certificado recibe NULL.
+-- =========================================
+
+CREATE VIEW vw_cliente AS
+SELECT
+    c.id_cliente,
+    CONVERT(VARCHAR(20), DECRYPTBYKEYAUTOCERT(CERT_ID('cert_datos_personales'), NULL, c.cedula)) AS cedula,
+    c.nombre,
+    c.apellido,
+    c.telefono,
+    c.correo
+FROM dbo.CLIENTE c
+GO
+
+-- =========================================
 -- VISTA vw_permisos_empleado
 -- =========================================
 
@@ -407,35 +424,55 @@ CREATE PROCEDURE sp_rol_reemplazar_permisos
 AS
 BEGIN
     SET NOCOUNT ON
+    SET XACT_ABORT ON
 
     DECLARE @claves TABLE (clave VARCHAR(60) PRIMARY KEY)
     DECLARE @desconocido VARCHAR(60), @mensaje NVARCHAR(200)
+    -- Se llama desde sp_rol_insertar / sp_rol_actualizar, que ya abrieron una transacción.
+    -- Solo abre (y confirma o revierte) la suya cuando se ejecuta solo.
+    DECLARE @transaccion_propia BIT = 0
 
-    IF ISJSON(ISNULL(@permisos, N'')) = 0
-        THROW 50104, 'La lista de permisos no tiene un formato válido.', 1
+    BEGIN TRY
+        IF ISJSON(ISNULL(@permisos, N'')) = 0
+            THROW 50104, 'La lista de permisos no tiene un formato válido.', 1
 
-    INSERT INTO @claves (clave)
-    SELECT DISTINCT LTRIM(RTRIM(value)) FROM OPENJSON(@permisos)
+        INSERT INTO @claves (clave)
+        SELECT DISTINCT LTRIM(RTRIM(value)) FROM OPENJSON(@permisos)
 
-    SELECT TOP (1) @desconocido = c.clave
-    FROM @claves c
-    WHERE NOT EXISTS (SELECT 1 FROM dbo.PERMISO p WHERE p.clave = c.clave)
+        SELECT TOP (1) @desconocido = c.clave
+        FROM @claves c
+        WHERE NOT EXISTS (SELECT 1 FROM dbo.PERMISO p WHERE p.clave = c.clave)
 
-    IF @desconocido IS NOT NULL
-    BEGIN
-        SET @mensaje = CONCAT(N'El permiso ', @desconocido, N' no existe.');
-        THROW 50104, @mensaje, 1
-    END
+        IF @desconocido IS NOT NULL
+        BEGIN
+            SET @mensaje = CONCAT(N'El permiso ', @desconocido, N' no existe.');
+            THROW 50104, @mensaje, 1
+        END
 
-    DELETE FROM dbo.ROL_PERMISO WHERE id_rol = @id_rol
+        IF @@TRANCOUNT = 0
+        BEGIN
+            BEGIN TRANSACTION;
+            SET @transaccion_propia = 1
+        END
 
-    INSERT INTO dbo.ROL_PERMISO (id_rol, id_permiso)
-    SELECT @id_rol, p.id_permiso
-    FROM dbo.PERMISO p
-    INNER JOIN @claves c ON c.clave = p.clave
+        DELETE FROM dbo.ROL_PERMISO WHERE id_rol = @id_rol
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.EMPLEADO e WHERE dbo.fn_tiene_permiso(e.id_empleado, 'roles.editar') = 1)
-        THROW 50105, 'Debe quedar al menos un empleado activo con permiso para editar roles.', 1
+        INSERT INTO dbo.ROL_PERMISO (id_rol, id_permiso)
+        SELECT @id_rol, p.id_permiso
+        FROM dbo.PERMISO p
+        INNER JOIN @claves c ON c.clave = p.clave
+
+        IF NOT EXISTS (SELECT 1 FROM dbo.EMPLEADO e WHERE dbo.fn_tiene_permiso(e.id_empleado, 'roles.editar') = 1)
+            THROW 50105, 'Debe quedar al menos un empleado activo con permiso para editar roles.', 1
+
+        IF @transaccion_propia = 1
+            COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @transaccion_propia = 1 AND @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -533,9 +570,14 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.ROL WHERE id_rol = @id_rol)
             THROW 50101, 'El rol no existe.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.ROL WHERE id_rol = @id_rol
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar el rol: tiene empleados asociados.', 1;
         THROW
@@ -554,15 +596,21 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_rol IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.ROL WHERE id_rol = @id_rol)
-        THROW 50101, 'El rol no existe.', 1
+    BEGIN TRY
+        IF @id_rol IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.ROL WHERE id_rol = @id_rol)
+            THROW 50101, 'El rol no existe.', 1
 
-    SELECT r.id_rol, r.nombre_rol, p.clave AS permiso
-    FROM dbo.ROL r
-    LEFT JOIN dbo.ROL_PERMISO rp ON rp.id_rol = r.id_rol
-    LEFT JOIN dbo.PERMISO p ON p.id_permiso = rp.id_permiso
-    WHERE @id_rol IS NULL OR r.id_rol = @id_rol
-    ORDER BY r.nombre_rol, p.clave
+        SELECT r.id_rol, r.nombre_rol, p.clave AS permiso
+        FROM dbo.ROL r
+        LEFT JOIN dbo.ROL_PERMISO rp ON rp.id_rol = r.id_rol
+        LEFT JOIN dbo.PERMISO p ON p.id_permiso = rp.id_permiso
+        WHERE @id_rol IS NULL OR r.id_rol = @id_rol
+        ORDER BY r.nombre_rol, p.clave
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -583,12 +631,17 @@ BEGIN
         IF NULLIF(LTRIM(RTRIM(@nombre_estacion)), '') IS NULL
             THROW 50100, 'El nombre de la estación es obligatorio.', 1
 
+        BEGIN TRANSACTION;
+
         INSERT INTO dbo.ESTACION (nombre_estacion)
         VALUES (LTRIM(RTRIM(@nombre_estacion)))
 
         SET @id_estacion = SCOPE_IDENTITY()
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe una estación con ese nombre.', 1
         IF ERROR_NUMBER() = 547
@@ -617,11 +670,16 @@ BEGIN
         IF NULLIF(LTRIM(RTRIM(@nombre_estacion)), '') IS NULL
             THROW 50100, 'El nombre de la estación es obligatorio.', 1
 
+        BEGIN TRANSACTION;
+
         UPDATE dbo.ESTACION
         SET nombre_estacion = LTRIM(RTRIM(@nombre_estacion))
         WHERE id_estacion = @id_estacion
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe una estación con ese nombre.', 1
         IF ERROR_NUMBER() = 547
@@ -647,9 +705,14 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.ESTACION WHERE id_estacion = @id_estacion)
             THROW 50101, 'La estación no existe.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.ESTACION WHERE id_estacion = @id_estacion
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar la estación: tiene productos o cocineros asociados.', 1;
         THROW
@@ -668,13 +731,19 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_estacion IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.ESTACION WHERE id_estacion = @id_estacion)
-        THROW 50101, 'La estación no existe.', 1
+    BEGIN TRY
+        IF @id_estacion IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.ESTACION WHERE id_estacion = @id_estacion)
+            THROW 50101, 'La estación no existe.', 1
 
-    SELECT id_estacion, nombre_estacion
-    FROM dbo.ESTACION
-    WHERE @id_estacion IS NULL OR id_estacion = @id_estacion
-    ORDER BY nombre_estacion
+        SELECT id_estacion, nombre_estacion
+        FROM dbo.ESTACION
+        WHERE @id_estacion IS NULL OR id_estacion = @id_estacion
+        ORDER BY nombre_estacion
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -696,12 +765,17 @@ BEGIN
         IF NULLIF(LTRIM(RTRIM(@nombre_categoria)), '') IS NULL
             THROW 50100, 'El nombre de la categoría es obligatorio.', 1
 
+        BEGIN TRANSACTION;
+
         INSERT INTO dbo.CATEGORIA (nombre_categoria, descripcion)
         VALUES (LTRIM(RTRIM(@nombre_categoria)), NULLIF(LTRIM(RTRIM(@descripcion)), ''))
 
         SET @id_categoria = SCOPE_IDENTITY()
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe una categoría con ese nombre.', 1
         IF ERROR_NUMBER() = 547
@@ -731,12 +805,17 @@ BEGIN
         IF NULLIF(LTRIM(RTRIM(@nombre_categoria)), '') IS NULL
             THROW 50100, 'El nombre de la categoría es obligatorio.', 1
 
+        BEGIN TRANSACTION;
+
         UPDATE dbo.CATEGORIA
         SET nombre_categoria = LTRIM(RTRIM(@nombre_categoria)),
             descripcion = NULLIF(LTRIM(RTRIM(@descripcion)), '')
         WHERE id_categoria = @id_categoria
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe una categoría con ese nombre.', 1
         IF ERROR_NUMBER() = 547
@@ -762,9 +841,14 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.CATEGORIA WHERE id_categoria = @id_categoria)
             THROW 50101, 'La categoría no existe.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.CATEGORIA WHERE id_categoria = @id_categoria
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar la categoría: tiene productos asociados.', 1;
         THROW
@@ -783,13 +867,19 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_categoria IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.CATEGORIA WHERE id_categoria = @id_categoria)
-        THROW 50101, 'La categoría no existe.', 1
+    BEGIN TRY
+        IF @id_categoria IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.CATEGORIA WHERE id_categoria = @id_categoria)
+            THROW 50101, 'La categoría no existe.', 1
 
-    SELECT id_categoria, nombre_categoria, descripcion
-    FROM dbo.CATEGORIA
-    WHERE @id_categoria IS NULL OR id_categoria = @id_categoria
-    ORDER BY nombre_categoria
+        SELECT id_categoria, nombre_categoria, descripcion
+        FROM dbo.CATEGORIA
+        WHERE @id_categoria IS NULL OR id_categoria = @id_categoria
+        ORDER BY nombre_categoria
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -810,12 +900,17 @@ BEGIN
         IF NULLIF(LTRIM(RTRIM(@nombre_metodo)), '') IS NULL
             THROW 50100, 'El nombre del método de pago es obligatorio.', 1
 
+        BEGIN TRANSACTION;
+
         INSERT INTO dbo.METODO_PAGO (nombre_metodo)
         VALUES (LTRIM(RTRIM(@nombre_metodo)))
 
         SET @id_metodo_pago = SCOPE_IDENTITY()
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe un método de pago con ese nombre.', 1
         IF ERROR_NUMBER() = 547
@@ -844,11 +939,16 @@ BEGIN
         IF NULLIF(LTRIM(RTRIM(@nombre_metodo)), '') IS NULL
             THROW 50100, 'El nombre del método de pago es obligatorio.', 1
 
+        BEGIN TRANSACTION;
+
         UPDATE dbo.METODO_PAGO
         SET nombre_metodo = LTRIM(RTRIM(@nombre_metodo))
         WHERE id_metodo_pago = @id_metodo_pago
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe un método de pago con ese nombre.', 1
         IF ERROR_NUMBER() = 547
@@ -874,9 +974,14 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.METODO_PAGO WHERE id_metodo_pago = @id_metodo_pago)
             THROW 50101, 'El método de pago no existe.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.METODO_PAGO WHERE id_metodo_pago = @id_metodo_pago
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar el método de pago: tiene pagos asociados.', 1;
         THROW
@@ -895,13 +1000,19 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_metodo_pago IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.METODO_PAGO WHERE id_metodo_pago = @id_metodo_pago)
-        THROW 50101, 'El método de pago no existe.', 1
+    BEGIN TRY
+        IF @id_metodo_pago IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.METODO_PAGO WHERE id_metodo_pago = @id_metodo_pago)
+            THROW 50101, 'El método de pago no existe.', 1
 
-    SELECT id_metodo_pago, nombre_metodo
-    FROM dbo.METODO_PAGO
-    WHERE @id_metodo_pago IS NULL OR id_metodo_pago = @id_metodo_pago
-    ORDER BY nombre_metodo
+        SELECT id_metodo_pago, nombre_metodo
+        FROM dbo.METODO_PAGO
+        WHERE @id_metodo_pago IS NULL OR id_metodo_pago = @id_metodo_pago
+        ORDER BY nombre_metodo
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -931,12 +1042,17 @@ BEGIN
         IF @estado NOT IN ('DISPONIBLE', 'OCUPADA', 'RESERVADA', 'MANTENIMIENTO')
             THROW 50100, 'Estado de mesa no válido.', 1
 
+        BEGIN TRANSACTION;
+
         INSERT INTO dbo.MESA (numero_mesa, capacidad, zona, estado)
         VALUES (@numero_mesa, @capacidad, LTRIM(RTRIM(@zona)), LTRIM(RTRIM(@estado)))
 
         SET @id_mesa = SCOPE_IDENTITY()
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe una mesa con ese número.', 1
         IF ERROR_NUMBER() = 547
@@ -974,14 +1090,19 @@ BEGIN
         IF @estado NOT IN ('DISPONIBLE', 'OCUPADA', 'RESERVADA', 'MANTENIMIENTO')
             THROW 50100, 'Estado de mesa no válido.', 1
 
+        BEGIN TRANSACTION;
+
         UPDATE dbo.MESA
         SET numero_mesa = @numero_mesa,
             capacidad = @capacidad,
             zona = LTRIM(RTRIM(@zona)),
             estado = LTRIM(RTRIM(@estado))
         WHERE id_mesa = @id_mesa
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe una mesa con ese número.', 1
         IF ERROR_NUMBER() = 547
@@ -1007,9 +1128,14 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.MESA WHERE id_mesa = @id_mesa)
             THROW 50101, 'La mesa no existe.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.MESA WHERE id_mesa = @id_mesa
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar la mesa: tiene pedidos asociados. Puede ponerla en mantenimiento.', 1;
         THROW
@@ -1028,13 +1154,19 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_mesa IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.MESA WHERE id_mesa = @id_mesa)
-        THROW 50101, 'La mesa no existe.', 1
+    BEGIN TRY
+        IF @id_mesa IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.MESA WHERE id_mesa = @id_mesa)
+            THROW 50101, 'La mesa no existe.', 1
 
-    SELECT id_mesa, numero_mesa, capacidad, zona, estado
-    FROM dbo.MESA
-    WHERE @id_mesa IS NULL OR id_mesa = @id_mesa
-    ORDER BY numero_mesa
+        SELECT id_mesa, numero_mesa, capacidad, zona, estado
+        FROM dbo.MESA
+        WHERE @id_mesa IS NULL OR id_mesa = @id_mesa
+        ORDER BY numero_mesa
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -1056,17 +1188,41 @@ BEGIN
     SET XACT_ABORT ON
 
     BEGIN TRY
-        IF NULLIF(LTRIM(RTRIM(@cedula)), '') IS NULL
+        -- La cédula se normaliza (sin guiones ni espacios) antes de cifrarla y de calcular su huella
+        SET @cedula = REPLACE(REPLACE(LTRIM(RTRIM(@cedula)), '-', ''), ' ', '')
+
+        IF NULLIF(@cedula, '') IS NULL
             THROW 50100, 'La cédula del cliente es obligatoria.', 1
+        IF @cedula LIKE '%[^0-9A-Za-z]%'
+            THROW 50100, 'La cédula solo puede tener números y letras.', 1
         IF NULLIF(LTRIM(RTRIM(@nombre)), '') IS NULL OR NULLIF(LTRIM(RTRIM(@apellido)), '') IS NULL
             THROW 50100, 'Nombre y apellido del cliente son obligatorios.', 1
 
-        INSERT INTO dbo.CLIENTE (cedula, nombre, apellido, telefono, correo)
-        VALUES (LTRIM(RTRIM(@cedula)), LTRIM(RTRIM(@nombre)), LTRIM(RTRIM(@apellido)), NULLIF(LTRIM(RTRIM(@telefono)), ''), NULLIF(LTRIM(RTRIM(@correo)), ''))
+        BEGIN TRANSACTION;
+
+        -- Cifrado AES-256 con la llave simétrica protegida por certificado (ver 1_RestauranteDB_estructura.sql)
+        OPEN SYMMETRIC KEY llave_datos_personales DECRYPTION BY CERTIFICATE cert_datos_personales;
+
+        INSERT INTO dbo.CLIENTE (cedula, cedula_hash, nombre, apellido, telefono, correo)
+        VALUES (
+            ENCRYPTBYKEY(KEY_GUID('llave_datos_personales'), @cedula),
+            HASHBYTES('SHA2_256', @cedula),
+            LTRIM(RTRIM(@nombre)),
+            LTRIM(RTRIM(@apellido)),
+            NULLIF(LTRIM(RTRIM(@telefono)), ''),
+            NULLIF(LTRIM(RTRIM(@correo)), '')
+        )
 
         SET @id_cliente = SCOPE_IDENTITY()
+
+        CLOSE SYMMETRIC KEY llave_datos_personales;
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF EXISTS (SELECT 1 FROM sys.openkeys WHERE key_name = 'llave_datos_personales')
+            CLOSE SYMMETRIC KEY llave_datos_personales;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe un cliente con esa cédula.', 1
         IF ERROR_NUMBER() = 547
@@ -1096,20 +1252,36 @@ BEGIN
     BEGIN TRY
         IF NOT EXISTS (SELECT 1 FROM dbo.CLIENTE WHERE id_cliente = @id_cliente)
             THROW 50101, 'El cliente no existe.', 1
-        IF NULLIF(LTRIM(RTRIM(@cedula)), '') IS NULL
+        SET @cedula = REPLACE(REPLACE(LTRIM(RTRIM(@cedula)), '-', ''), ' ', '')
+
+        IF NULLIF(@cedula, '') IS NULL
             THROW 50100, 'La cédula del cliente es obligatoria.', 1
+        IF @cedula LIKE '%[^0-9A-Za-z]%'
+            THROW 50100, 'La cédula solo puede tener números y letras.', 1
         IF NULLIF(LTRIM(RTRIM(@nombre)), '') IS NULL OR NULLIF(LTRIM(RTRIM(@apellido)), '') IS NULL
             THROW 50100, 'Nombre y apellido del cliente son obligatorios.', 1
 
+        BEGIN TRANSACTION;
+
+        OPEN SYMMETRIC KEY llave_datos_personales DECRYPTION BY CERTIFICATE cert_datos_personales;
+
         UPDATE dbo.CLIENTE
-        SET cedula = LTRIM(RTRIM(@cedula)),
+        SET cedula = ENCRYPTBYKEY(KEY_GUID('llave_datos_personales'), @cedula),
+            cedula_hash = HASHBYTES('SHA2_256', @cedula),
             nombre = LTRIM(RTRIM(@nombre)),
             apellido = LTRIM(RTRIM(@apellido)),
             telefono = NULLIF(LTRIM(RTRIM(@telefono)), ''),
             correo = NULLIF(LTRIM(RTRIM(@correo)), '')
         WHERE id_cliente = @id_cliente
+
+        CLOSE SYMMETRIC KEY llave_datos_personales;
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF EXISTS (SELECT 1 FROM sys.openkeys WHERE key_name = 'llave_datos_personales')
+            CLOSE SYMMETRIC KEY llave_datos_personales;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe un cliente con esa cédula.', 1
         IF ERROR_NUMBER() = 547
@@ -1135,9 +1307,14 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.CLIENTE WHERE id_cliente = @id_cliente)
             THROW 50101, 'El cliente no existe.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.CLIENTE WHERE id_cliente = @id_cliente
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar el cliente: tiene facturas asociadas.', 1;
         THROW
@@ -1156,13 +1333,20 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_cliente IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.CLIENTE WHERE id_cliente = @id_cliente)
-        THROW 50101, 'El cliente no existe.', 1
+    BEGIN TRY
+        IF @id_cliente IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.CLIENTE WHERE id_cliente = @id_cliente)
+            THROW 50101, 'El cliente no existe.', 1
 
-    SELECT id_cliente, cedula, nombre, apellido, telefono, correo
-    FROM dbo.CLIENTE
-    WHERE @id_cliente IS NULL OR id_cliente = @id_cliente
-    ORDER BY apellido, nombre
+        -- La cédula se devuelve descifrada; solo quien tenga permiso sobre el certificado puede leerla
+        SELECT id_cliente, cedula, nombre, apellido, telefono, correo
+        FROM dbo.vw_cliente
+        WHERE @id_cliente IS NULL OR id_cliente = @id_cliente
+        ORDER BY apellido, nombre
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -1195,12 +1379,17 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.ESTACION WHERE id_estacion = @id_estacion)
             THROW 50100, 'La estación indicada no existe.', 1
 
+        BEGIN TRANSACTION;
+
         INSERT INTO dbo.PRODUCTO (nombre_producto, descripcion, precio, id_categoria, id_estacion, activo, foto)
         VALUES (LTRIM(RTRIM(@nombre_producto)), NULLIF(LTRIM(RTRIM(@descripcion)), ''), @precio, @id_categoria, @id_estacion, @activo, NULLIF(LTRIM(RTRIM(@foto)), ''))
 
         SET @id_producto = SCOPE_IDENTITY()
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe un producto con ese nombre.', 1
         IF ERROR_NUMBER() = 547
@@ -1241,6 +1430,8 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.ESTACION WHERE id_estacion = @id_estacion)
             THROW 50100, 'La estación indicada no existe.', 1
 
+        BEGIN TRANSACTION;
+
         UPDATE dbo.PRODUCTO
         SET nombre_producto = LTRIM(RTRIM(@nombre_producto)),
             descripcion = NULLIF(LTRIM(RTRIM(@descripcion)), ''),
@@ -1250,8 +1441,11 @@ BEGIN
             activo = @activo,
             foto = NULLIF(LTRIM(RTRIM(@foto)), '')
         WHERE id_producto = @id_producto
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe un producto con ese nombre.', 1
         IF ERROR_NUMBER() = 547
@@ -1278,11 +1472,16 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.PRODUCTO WHERE id_producto = @id_producto)
             THROW 50101, 'El producto no existe.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.PRODUCTO WHERE id_producto = @id_producto
 
         SET @desactivado = CASE WHEN EXISTS (SELECT 1 FROM dbo.PRODUCTO WHERE id_producto = @id_producto) THEN 1 ELSE 0 END
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar el producto: tiene registros relacionados.', 1;
         THROW
@@ -1301,13 +1500,19 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_producto IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.PRODUCTO WHERE id_producto = @id_producto)
-        THROW 50101, 'El producto no existe.', 1
+    BEGIN TRY
+        IF @id_producto IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.PRODUCTO WHERE id_producto = @id_producto)
+            THROW 50101, 'El producto no existe.', 1
 
-    SELECT id_producto, nombre_producto, descripcion, precio, id_categoria, id_estacion, activo, foto
-    FROM dbo.PRODUCTO
-    WHERE @id_producto IS NULL OR id_producto = @id_producto
-    ORDER BY nombre_producto
+        SELECT id_producto, nombre_producto, descripcion, precio, id_categoria, id_estacion, activo, foto
+        FROM dbo.PRODUCTO
+        WHERE @id_producto IS NULL OR id_producto = @id_producto
+        ORDER BY nombre_producto
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -1334,12 +1539,17 @@ BEGIN
         IF @stock_actual IS NULL OR @stock_actual < 0 OR @stock_minimo IS NULL OR @stock_minimo < 0 OR @costo_unitario IS NULL OR @costo_unitario < 0
             THROW 50100, 'Stock y costo no pueden ser negativos.', 1
 
+        BEGIN TRANSACTION;
+
         INSERT INTO dbo.INSUMO (nombre_insumo, unidad_medida, stock_actual, stock_minimo, costo_unitario)
         VALUES (LTRIM(RTRIM(@nombre_insumo)), LTRIM(RTRIM(@unidad_medida)), @stock_actual, @stock_minimo, @costo_unitario)
 
         SET @id_insumo = SCOPE_IDENTITY()
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe un insumo con ese nombre.', 1
         IF ERROR_NUMBER() = 547
@@ -1374,6 +1584,8 @@ BEGIN
         IF @stock_actual IS NULL OR @stock_actual < 0 OR @stock_minimo IS NULL OR @stock_minimo < 0 OR @costo_unitario IS NULL OR @costo_unitario < 0
             THROW 50100, 'Stock y costo no pueden ser negativos.', 1
 
+        BEGIN TRANSACTION;
+
         UPDATE dbo.INSUMO
         SET nombre_insumo = LTRIM(RTRIM(@nombre_insumo)),
             unidad_medida = LTRIM(RTRIM(@unidad_medida)),
@@ -1381,8 +1593,11 @@ BEGIN
             stock_minimo = @stock_minimo,
             costo_unitario = @costo_unitario
         WHERE id_insumo = @id_insumo
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe un insumo con ese nombre.', 1
         IF ERROR_NUMBER() = 547
@@ -1408,9 +1623,14 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.INSUMO WHERE id_insumo = @id_insumo)
             THROW 50101, 'El insumo no existe.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.INSUMO WHERE id_insumo = @id_insumo
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar el insumo: se usa en recetas o tiene alertas de stock.', 1;
         THROW
@@ -1429,13 +1649,19 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_insumo IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.INSUMO WHERE id_insumo = @id_insumo)
-        THROW 50101, 'El insumo no existe.', 1
+    BEGIN TRY
+        IF @id_insumo IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.INSUMO WHERE id_insumo = @id_insumo)
+            THROW 50101, 'El insumo no existe.', 1
 
-    SELECT id_insumo, nombre_insumo, unidad_medida, stock_actual, stock_minimo, costo_unitario
-    FROM dbo.INSUMO
-    WHERE @id_insumo IS NULL OR id_insumo = @id_insumo
-    ORDER BY nombre_insumo
+        SELECT id_insumo, nombre_insumo, unidad_medida, stock_actual, stock_minimo, costo_unitario
+        FROM dbo.INSUMO
+        WHERE @id_insumo IS NULL OR id_insumo = @id_insumo
+        ORDER BY nombre_insumo
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -1461,10 +1687,15 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.INSUMO WHERE id_insumo = @id_insumo)
             THROW 50100, 'El insumo indicado no existe.', 1
 
+        BEGIN TRANSACTION;
+
         INSERT INTO dbo.RECETA (id_producto, id_insumo, cantidad)
         VALUES (@id_producto, @id_insumo, @cantidad)
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ese insumo ya está en la receta del producto.', 1
         IF ERROR_NUMBER() = 547
@@ -1498,11 +1729,16 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.INSUMO WHERE id_insumo = @id_insumo)
             THROW 50100, 'El insumo indicado no existe.', 1
 
+        BEGIN TRANSACTION;
+
         UPDATE dbo.RECETA
         SET cantidad = @cantidad
         WHERE id_producto = @id_producto AND id_insumo = @id_insumo
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ese insumo ya está en la receta del producto.', 1
         IF ERROR_NUMBER() = 547
@@ -1531,10 +1767,15 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.PRODUCTO WHERE id_producto = @id_producto)
             THROW 50101, 'El producto indicado no existe.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.RECETA
         WHERE id_producto = @id_producto AND (@id_insumo IS NULL OR id_insumo = @id_insumo)
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar la receta.', 1;
         THROW
@@ -1553,15 +1794,21 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_producto IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.PRODUCTO WHERE id_producto = @id_producto)
-        THROW 50101, 'El producto indicado no existe.', 1
+    BEGIN TRY
+        IF @id_producto IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.PRODUCTO WHERE id_producto = @id_producto)
+            THROW 50101, 'El producto indicado no existe.', 1
 
-    SELECT r.id_producto, p.nombre_producto, r.id_insumo, i.nombre_insumo, i.unidad_medida, r.cantidad
-    FROM dbo.RECETA r
-    INNER JOIN dbo.PRODUCTO p ON p.id_producto = r.id_producto
-    INNER JOIN dbo.INSUMO i ON i.id_insumo = r.id_insumo
-    WHERE @id_producto IS NULL OR r.id_producto = @id_producto
-    ORDER BY p.nombre_producto, i.nombre_insumo
+        SELECT r.id_producto, p.nombre_producto, r.id_insumo, i.nombre_insumo, i.unidad_medida, r.cantidad
+        FROM dbo.RECETA r
+        INNER JOIN dbo.PRODUCTO p ON p.id_producto = r.id_producto
+        INNER JOIN dbo.INSUMO i ON i.id_insumo = r.id_insumo
+        WHERE @id_producto IS NULL OR r.id_producto = @id_producto
+        ORDER BY p.nombre_producto, i.nombre_insumo
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -1593,12 +1840,17 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.ROL WHERE id_rol = @id_rol)
             THROW 50100, 'El rol indicado no existe.', 1
 
+        BEGIN TRANSACTION;
+
         INSERT INTO dbo.EMPLEADO (nombre, apellido, correo, contrasena_hash, id_rol, activo)
         VALUES (LTRIM(RTRIM(@nombre)), LTRIM(RTRIM(@apellido)), LTRIM(RTRIM(@correo)), LTRIM(RTRIM(@contrasena_hash)), @id_rol, @activo)
 
         SET @id_empleado = SCOPE_IDENTITY()
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe un empleado con ese correo.', 1
         IF ERROR_NUMBER() = 547
@@ -1640,6 +1892,8 @@ BEGIN
            AND NOT EXISTS (SELECT 1 FROM dbo.EMPLEADO e WHERE e.id_empleado <> @id_empleado AND dbo.fn_tiene_permiso(e.id_empleado, 'roles.editar') = 1)
             THROW 50105, 'Debe quedar al menos un empleado activo con permiso para editar roles.', 1
 
+        BEGIN TRANSACTION;
+
         UPDATE dbo.EMPLEADO
         SET nombre = LTRIM(RTRIM(@nombre)),
             apellido = LTRIM(RTRIM(@apellido)),
@@ -1648,8 +1902,11 @@ BEGIN
             id_rol = @id_rol,
             activo = @activo
         WHERE id_empleado = @id_empleado
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ya existe un empleado con ese correo.', 1
         IF ERROR_NUMBER() = 547
@@ -1678,9 +1935,14 @@ BEGIN
            AND NOT EXISTS (SELECT 1 FROM dbo.EMPLEADO e WHERE e.id_empleado <> @id_empleado AND dbo.fn_tiene_permiso(e.id_empleado, 'roles.editar') = 1)
             THROW 50105, 'Debe quedar al menos un empleado activo con permiso para editar roles.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.EMPLEADO WHERE id_empleado = @id_empleado
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar el empleado: tiene pedidos, turnos o facturas asociados. Puede desactivarlo.', 1;
         THROW
@@ -1699,13 +1961,19 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_empleado IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.EMPLEADO WHERE id_empleado = @id_empleado)
-        THROW 50101, 'El empleado no existe.', 1
+    BEGIN TRY
+        IF @id_empleado IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.EMPLEADO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El empleado no existe.', 1
 
-    SELECT id_empleado, nombre, apellido, correo, id_rol, fecha_ingreso, activo
-    FROM dbo.EMPLEADO
-    WHERE @id_empleado IS NULL OR id_empleado = @id_empleado
-    ORDER BY apellido, nombre
+        SELECT id_empleado, nombre, apellido, correo, id_rol, fecha_ingreso, activo
+        FROM dbo.EMPLEADO
+        WHERE @id_empleado IS NULL OR id_empleado = @id_empleado
+        ORDER BY apellido, nombre
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -1729,12 +1997,17 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.CAJERO c INNER JOIN dbo.EMPLEADO e ON e.id_empleado = c.id_empleado WHERE c.id_empleado = @id_empleado AND e.activo = 1)
             THROW 50100, 'El empleado no es un cajero activo.', 1
 
+        BEGIN TRANSACTION;
+
         INSERT INTO dbo.TURNO_CAJA (id_empleado, monto_inicial)
         VALUES (@id_empleado, @monto_inicial)
 
         SET @id_turno = SCOPE_IDENTITY()
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ese cajero ya tiene un turno abierto.', 1
         IF ERROR_NUMBER() = 547
@@ -1770,14 +2043,19 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.CAJERO c INNER JOIN dbo.EMPLEADO e ON e.id_empleado = c.id_empleado WHERE c.id_empleado = @id_empleado AND e.activo = 1)
             THROW 50100, 'El empleado no es un cajero activo.', 1
 
+        BEGIN TRANSACTION;
+
         UPDATE dbo.TURNO_CAJA
         SET id_empleado = @id_empleado,
             monto_inicial = @monto_inicial,
             fecha_cierre = @fecha_cierre,
             monto_final = @monto_final
         WHERE id_turno = @id_turno
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() IN (2601, 2627)
             THROW 50103, 'Ese cajero ya tiene un turno abierto.', 1
         IF ERROR_NUMBER() = 547
@@ -1803,9 +2081,14 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM dbo.TURNO_CAJA WHERE id_turno = @id_turno)
             THROW 50101, 'El turno de caja no existe.', 1
 
+        BEGIN TRANSACTION;
+
         DELETE FROM dbo.TURNO_CAJA WHERE id_turno = @id_turno
+
+        COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         IF ERROR_NUMBER() = 547
             THROW 50102, 'No se puede eliminar el turno: tiene facturas asociadas.', 1;
         THROW
@@ -1824,13 +2107,579 @@ AS
 BEGIN
     SET NOCOUNT ON
 
-    IF @id_turno IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.TURNO_CAJA WHERE id_turno = @id_turno)
-        THROW 50101, 'El turno de caja no existe.', 1
+    BEGIN TRY
+        IF @id_turno IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.TURNO_CAJA WHERE id_turno = @id_turno)
+            THROW 50101, 'El turno de caja no existe.', 1
 
-    SELECT id_turno, id_empleado, monto_inicial, fecha_cierre, monto_final
-    FROM dbo.TURNO_CAJA
-    WHERE @id_turno IS NULL OR id_turno = @id_turno
-    ORDER BY fecha_apertura DESC
+        SELECT id_turno, id_empleado, monto_inicial, fecha_cierre, monto_final
+        FROM dbo.TURNO_CAJA
+        WHERE @id_turno IS NULL OR id_turno = @id_turno
+        ORDER BY fecha_apertura DESC
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_permiso_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_permiso_insertar
+    @clave VARCHAR(60),
+    @modulo VARCHAR(50),
+    @descripcion VARCHAR(150),
+    @id_permiso INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    BEGIN TRY
+        SET @clave = LOWER(LTRIM(RTRIM(@clave)))
+
+        IF NULLIF(@clave, '') IS NULL OR @clave NOT LIKE '%_._%' OR @clave LIKE '% %'
+            THROW 50100, 'La clave del permiso debe tener el formato modulo.accion (sin espacios).', 1
+        IF NULLIF(LTRIM(RTRIM(@modulo)), '') IS NULL OR NULLIF(LTRIM(RTRIM(@descripcion)), '') IS NULL
+            THROW 50100, 'El módulo y la descripción del permiso son obligatorios.', 1
+
+        BEGIN TRANSACTION;
+
+        INSERT INTO dbo.PERMISO (clave, modulo, descripcion)
+        VALUES (@clave, LTRIM(RTRIM(@modulo)), LTRIM(RTRIM(@descripcion)))
+
+        SET @id_permiso = SCOPE_IDENTITY()
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF ERROR_NUMBER() IN (2601, 2627)
+            THROW 50103, 'Ya existe un permiso con esa clave.', 1;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_permiso_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_permiso_actualizar
+    @id_permiso INT,
+    @clave VARCHAR(60),
+    @modulo VARCHAR(50),
+    @descripcion VARCHAR(150)
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    DECLARE @clave_actual VARCHAR(60)
+
+    BEGIN TRY
+        SET @clave = LOWER(LTRIM(RTRIM(@clave)))
+
+        SELECT @clave_actual = clave FROM dbo.PERMISO WHERE id_permiso = @id_permiso
+
+        IF @clave_actual IS NULL
+            THROW 50101, 'El permiso no existe.', 1
+        IF NULLIF(@clave, '') IS NULL OR @clave NOT LIKE '%_._%' OR @clave LIKE '% %'
+            THROW 50100, 'La clave del permiso debe tener el formato modulo.accion (sin espacios).', 1
+        IF NULLIF(LTRIM(RTRIM(@modulo)), '') IS NULL OR NULLIF(LTRIM(RTRIM(@descripcion)), '') IS NULL
+            THROW 50100, 'El módulo y la descripción del permiso son obligatorios.', 1
+        -- La aplicación consulta los permisos por su clave: renombrar roles.editar dejaría a todos sin acceso a roles
+        IF @clave_actual = 'roles.editar' AND @clave <> @clave_actual
+            THROW 50105, 'La clave roles.editar no se puede cambiar.', 1
+
+        BEGIN TRANSACTION;
+
+        UPDATE dbo.PERMISO
+        SET clave = @clave,
+            modulo = LTRIM(RTRIM(@modulo)),
+            descripcion = LTRIM(RTRIM(@descripcion))
+        WHERE id_permiso = @id_permiso
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF ERROR_NUMBER() IN (2601, 2627)
+            THROW 50103, 'Ya existe un permiso con esa clave.', 1;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_permiso_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_permiso_eliminar
+    @id_permiso INT
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    DECLARE @clave VARCHAR(60)
+
+    BEGIN TRY
+        SELECT @clave = clave FROM dbo.PERMISO WHERE id_permiso = @id_permiso
+
+        IF @clave IS NULL
+            THROW 50101, 'El permiso no existe.', 1
+        IF @clave = 'roles.editar'
+            THROW 50105, 'El permiso roles.editar no se puede eliminar: sin él nadie podría administrar los roles.', 1
+
+        BEGIN TRANSACTION;
+
+        -- ROL_PERMISO se borra en cascada
+        DELETE FROM dbo.PERMISO WHERE id_permiso = @id_permiso
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_permiso_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_permiso_consultar
+    @id_permiso INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    BEGIN TRY
+        IF @id_permiso IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.PERMISO WHERE id_permiso = @id_permiso)
+            THROW 50101, 'El permiso no existe.', 1
+
+        SELECT p.id_permiso, p.clave, p.modulo, p.descripcion,
+               (SELECT COUNT(*) FROM dbo.ROL_PERMISO rp WHERE rp.id_permiso = p.id_permiso) AS roles_que_lo_tienen
+        FROM dbo.PERMISO p
+        WHERE @id_permiso IS NULL OR p.id_permiso = @id_permiso
+        ORDER BY p.modulo, p.clave
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_mesero_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_mesero_insertar
+    @id_empleado INT,
+    @zona_asignada VARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.EMPLEADO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El empleado no existe.', 1
+        IF NULLIF(LTRIM(RTRIM(@zona_asignada)), '') IS NULL
+            THROW 50100, 'La zona asignada del mesero es obligatoria.', 1
+        -- Especialización disjunta: un empleado pertenece a lo sumo a una subclase
+        IF EXISTS (SELECT 1 FROM dbo.COCINERO WHERE id_empleado = @id_empleado)
+           OR EXISTS (SELECT 1 FROM dbo.CAJERO WHERE id_empleado = @id_empleado)
+            THROW 50106, 'El empleado ya está registrado como cocinero o cajero.', 1
+
+        BEGIN TRANSACTION;
+
+        INSERT INTO dbo.MESERO (id_empleado, zona_asignada)
+        VALUES (@id_empleado, LTRIM(RTRIM(@zona_asignada)))
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF ERROR_NUMBER() IN (2601, 2627)
+            THROW 50103, 'El empleado ya está registrado como mesero.', 1;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_mesero_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_mesero_actualizar
+    @id_empleado INT,
+    @zona_asignada VARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.MESERO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El mesero no existe.', 1
+        IF NULLIF(LTRIM(RTRIM(@zona_asignada)), '') IS NULL
+            THROW 50100, 'La zona asignada del mesero es obligatoria.', 1
+
+        BEGIN TRANSACTION;
+
+        UPDATE dbo.MESERO
+        SET zona_asignada = LTRIM(RTRIM(@zona_asignada))
+        WHERE id_empleado = @id_empleado
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_mesero_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_mesero_eliminar
+    @id_empleado INT
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.MESERO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El mesero no existe.', 1
+
+        BEGIN TRANSACTION;
+
+        DELETE FROM dbo.MESERO WHERE id_empleado = @id_empleado
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_mesero_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_mesero_consultar
+    @id_empleado INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    BEGIN TRY
+        IF @id_empleado IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.MESERO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El mesero no existe.', 1
+
+        SELECT m.id_empleado, e.nombre, e.apellido, e.activo, m.zona_asignada
+        FROM dbo.MESERO m
+        INNER JOIN dbo.EMPLEADO e ON e.id_empleado = m.id_empleado
+        WHERE @id_empleado IS NULL OR m.id_empleado = @id_empleado
+        ORDER BY e.apellido, e.nombre
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_cocinero_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_cocinero_insertar
+    @id_empleado INT,
+    @id_estacion INT,
+    @especialidad VARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.EMPLEADO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El empleado no existe.', 1
+        IF NOT EXISTS (SELECT 1 FROM dbo.ESTACION WHERE id_estacion = @id_estacion)
+            THROW 50100, 'La estación indicada no existe.', 1
+        IF NULLIF(LTRIM(RTRIM(@especialidad)), '') IS NULL
+            THROW 50100, 'La especialidad del cocinero es obligatoria.', 1
+        IF EXISTS (SELECT 1 FROM dbo.MESERO WHERE id_empleado = @id_empleado)
+           OR EXISTS (SELECT 1 FROM dbo.CAJERO WHERE id_empleado = @id_empleado)
+            THROW 50106, 'El empleado ya está registrado como mesero o cajero.', 1
+
+        BEGIN TRANSACTION;
+
+        INSERT INTO dbo.COCINERO (id_empleado, id_estacion, especialidad)
+        VALUES (@id_empleado, @id_estacion, LTRIM(RTRIM(@especialidad)))
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF ERROR_NUMBER() IN (2601, 2627)
+            THROW 50103, 'El empleado ya está registrado como cocinero.', 1;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_cocinero_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_cocinero_actualizar
+    @id_empleado INT,
+    @id_estacion INT,
+    @especialidad VARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.COCINERO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El cocinero no existe.', 1
+        IF NOT EXISTS (SELECT 1 FROM dbo.ESTACION WHERE id_estacion = @id_estacion)
+            THROW 50100, 'La estación indicada no existe.', 1
+        IF NULLIF(LTRIM(RTRIM(@especialidad)), '') IS NULL
+            THROW 50100, 'La especialidad del cocinero es obligatoria.', 1
+
+        BEGIN TRANSACTION;
+
+        UPDATE dbo.COCINERO
+        SET id_estacion = @id_estacion,
+            especialidad = LTRIM(RTRIM(@especialidad))
+        WHERE id_empleado = @id_empleado
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_cocinero_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_cocinero_eliminar
+    @id_empleado INT
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.COCINERO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El cocinero no existe.', 1
+
+        BEGIN TRANSACTION;
+
+        DELETE FROM dbo.COCINERO WHERE id_empleado = @id_empleado
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_cocinero_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_cocinero_consultar
+    @id_empleado INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    BEGIN TRY
+        IF @id_empleado IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.COCINERO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El cocinero no existe.', 1
+
+        SELECT c.id_empleado, e.nombre, e.apellido, e.activo, c.id_estacion, es.nombre_estacion, c.especialidad
+        FROM dbo.COCINERO c
+        INNER JOIN dbo.EMPLEADO e ON e.id_empleado = c.id_empleado
+        INNER JOIN dbo.ESTACION es ON es.id_estacion = c.id_estacion
+        WHERE @id_empleado IS NULL OR c.id_empleado = @id_empleado
+        ORDER BY es.nombre_estacion, e.apellido, e.nombre
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_cajero_insertar
+-- =========================================
+
+CREATE PROCEDURE sp_cajero_insertar
+    @id_empleado INT,
+    @codigo_caja VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.EMPLEADO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El empleado no existe.', 1
+        IF NULLIF(LTRIM(RTRIM(@codigo_caja)), '') IS NULL
+            THROW 50100, 'El código de caja es obligatorio.', 1
+        IF EXISTS (SELECT 1 FROM dbo.MESERO WHERE id_empleado = @id_empleado)
+           OR EXISTS (SELECT 1 FROM dbo.COCINERO WHERE id_empleado = @id_empleado)
+            THROW 50106, 'El empleado ya está registrado como mesero o cocinero.', 1
+
+        BEGIN TRANSACTION;
+
+        INSERT INTO dbo.CAJERO (id_empleado, codigo_caja)
+        VALUES (@id_empleado, LTRIM(RTRIM(@codigo_caja)))
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF ERROR_NUMBER() IN (2601, 2627)
+            THROW 50103, 'El empleado ya es cajero o ese código de caja ya está asignado.', 1;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_cajero_actualizar
+-- =========================================
+
+CREATE PROCEDURE sp_cajero_actualizar
+    @id_empleado INT,
+    @codigo_caja VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.CAJERO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El cajero no existe.', 1
+        IF NULLIF(LTRIM(RTRIM(@codigo_caja)), '') IS NULL
+            THROW 50100, 'El código de caja es obligatorio.', 1
+
+        BEGIN TRANSACTION;
+
+        UPDATE dbo.CAJERO
+        SET codigo_caja = LTRIM(RTRIM(@codigo_caja))
+        WHERE id_empleado = @id_empleado
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF ERROR_NUMBER() IN (2601, 2627)
+            THROW 50103, 'Ese código de caja ya está asignado a otro cajero.', 1;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_cajero_eliminar
+-- =========================================
+
+CREATE PROCEDURE sp_cajero_eliminar
+    @id_empleado INT
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.CAJERO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El cajero no existe.', 1
+
+        BEGIN TRANSACTION;
+
+        -- Con un turno abierto, la caja quedaría sin responsable
+        IF EXISTS (SELECT 1 FROM dbo.TURNO_CAJA WITH (UPDLOCK, HOLDLOCK) WHERE id_empleado = @id_empleado AND fecha_cierre IS NULL)
+            THROW 50107, 'El cajero tiene un turno de caja abierto. Ciérrelo antes de quitarle el puesto.', 1
+
+        DELETE FROM dbo.CAJERO WHERE id_empleado = @id_empleado
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
+-- PROCEDIMIENTO sp_cajero_consultar
+-- =========================================
+
+CREATE PROCEDURE sp_cajero_consultar
+    @id_empleado INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    BEGIN TRY
+        IF @id_empleado IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.CAJERO WHERE id_empleado = @id_empleado)
+            THROW 50101, 'El cajero no existe.', 1
+
+        SELECT c.id_empleado, e.nombre, e.apellido, e.activo, c.codigo_caja,
+               CASE WHEN EXISTS (SELECT 1 FROM dbo.TURNO_CAJA t WHERE t.id_empleado = c.id_empleado AND t.fecha_cierre IS NULL)
+                    THEN 1 ELSE 0 END AS turno_abierto
+        FROM dbo.CAJERO c
+        INNER JOIN dbo.EMPLEADO e ON e.id_empleado = c.id_empleado
+        WHERE @id_empleado IS NULL OR c.id_empleado = @id_empleado
+        ORDER BY c.codigo_caja
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -2253,6 +3102,63 @@ GO
 
 
 -- =========================================
+-- PROCEDIMIENTO sp_anular_factura
+-- Anula una factura cobrada (nunca se borra): registra quién, por qué y cuándo.
+-- Bloquea la factura (UPDLOCK, HOLDLOCK) para que dos personas no la anulen a la vez.
+-- Los pagos no se tocan: trg_pago_inmutable los protege y quedan como historial.
+-- =========================================
+
+CREATE PROCEDURE sp_anular_factura
+    @id_factura INT,
+    @id_empleado INT,
+    @motivo VARCHAR(255),
+    @numero_factura VARCHAR(50) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT ON
+
+    DECLARE @estado VARCHAR(20)
+
+    BEGIN TRY
+        SET @motivo = NULLIF(LTRIM(RTRIM(@motivo)), '')
+
+        IF @motivo IS NULL
+            THROW 50060, 'Debe indicar el motivo de la anulación.', 1
+
+        IF dbo.fn_tiene_permiso(@id_empleado, 'facturas.anular') = 0
+            THROW 50061, 'El empleado que anula no existe, está inactivo o no tiene permiso para anular facturas.', 1
+
+        BEGIN TRANSACTION;
+
+        SELECT @estado = estado, @numero_factura = numero_factura
+        FROM dbo.FACTURA WITH (UPDLOCK, HOLDLOCK)
+        WHERE id_factura = @id_factura
+
+        IF @estado IS NULL
+            THROW 50062, 'La factura no existe.', 1
+
+        IF @estado = 'ANULADA'
+            THROW 50063, 'Esta factura ya está anulada.', 1
+
+        UPDATE dbo.FACTURA
+        SET estado = 'ANULADA',
+            anulada_por = @id_empleado,
+            motivo_anulacion = @motivo,
+            fecha_anulacion = GETDATE()
+        WHERE id_factura = @id_factura
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
+END
+GO
+
+
+-- =========================================
 -- PROCEDIMIENTO sp_reporte_ventas
 -- =========================================
 
@@ -2516,17 +3422,28 @@ CREATE PROCEDURE sp_sesion_validar
 AS
 BEGIN
     SET NOCOUNT ON
+    SET XACT_ABORT ON
 
-    SET @vigente = CASE WHEN EXISTS (
-        SELECT 1 FROM dbo.SESION_ACTIVA WHERE id_empleado = @id_empleado AND token = @token
-    ) THEN 1 ELSE 0 END
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
-    IF @vigente = 1
-        UPDATE dbo.SESION_ACTIVA
-        SET ultima_actividad = GETDATE()
-        WHERE id_empleado = @id_empleado
-          AND token = @token
-          AND ultima_actividad < DATEADD(SECOND, -30, GETDATE())
+        SET @vigente = CASE WHEN EXISTS (
+            SELECT 1 FROM dbo.SESION_ACTIVA WHERE id_empleado = @id_empleado AND token = @token
+        ) THEN 1 ELSE 0 END
+
+        IF @vigente = 1
+            UPDATE dbo.SESION_ACTIVA
+            SET ultima_actividad = GETDATE()
+            WHERE id_empleado = @id_empleado
+              AND token = @token
+              AND ultima_actividad < DATEADD(SECOND, -30, GETDATE())
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -2541,10 +3458,21 @@ CREATE PROCEDURE sp_sesion_cerrar
 AS
 BEGIN
     SET NOCOUNT ON
+    SET XACT_ABORT ON
 
-    DELETE FROM dbo.SESION_ACTIVA
-    WHERE id_empleado = @id_empleado
-      AND (@token IS NULL OR token = @token)
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        DELETE FROM dbo.SESION_ACTIVA
+        WHERE id_empleado = @id_empleado
+          AND (@token IS NULL OR token = @token)
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW
+    END CATCH
 END
 GO
 
@@ -2566,6 +3494,9 @@ GO
 
 GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON SCHEMA::dbo TO rol_administrador;
 GRANT BACKUP DATABASE TO rol_administrador;
+-- Solo el administrador puede descifrar la cédula de los clientes
+GRANT CONTROL ON CERTIFICATE::cert_datos_personales TO rol_administrador;
+GRANT VIEW DEFINITION ON SYMMETRIC KEY::llave_datos_personales TO rol_administrador;
 
 GRANT SELECT ON dbo.MESA TO rol_mesero;
 GRANT SELECT ON dbo.PRODUCTO TO rol_mesero;
@@ -2656,18 +3587,20 @@ BEGIN
     DECLARE @sql NVARCHAR(MAX)
     DECLARE @bd NVARCHAR(260) = QUOTENAME(@base)
 
-    IF @base IS NULL OR DB_ID(@base) IS NULL
-        THROW 50040, 'La base de datos que se quiere restaurar no existe en este servidor.', 1
-
-    IF @base IN (N'master', N'model', N'msdb', N'tempdb')
-        THROW 50041, 'No se permite restaurar bases de datos del sistema.', 1
-
-    IF NULLIF(LTRIM(RTRIM(@archivo)), N'') IS NULL
-        THROW 50042, 'Debe indicar el archivo de respaldo.', 1
-
-    RESTORE VERIFYONLY FROM DISK = @archivo WITH CHECKSUM
-
+    -- RESTORE no puede ejecutarse dentro de una transacción explícita: el control es TRY/CATCH
+    -- y, si algo falla, la base vuelve a MULTI_USER para no quedar bloqueada.
     BEGIN TRY
+        IF @base IS NULL OR DB_ID(@base) IS NULL
+            THROW 50040, 'La base de datos que se quiere restaurar no existe en este servidor.', 1
+
+        IF @base IN (N'master', N'model', N'msdb', N'tempdb')
+            THROW 50041, 'No se permite restaurar bases de datos del sistema.', 1
+
+        IF NULLIF(LTRIM(RTRIM(@archivo)), N'') IS NULL
+            THROW 50042, 'Debe indicar el archivo de respaldo.', 1
+
+        RESTORE VERIFYONLY FROM DISK = @archivo WITH CHECKSUM
+
         SET @sql = N'ALTER DATABASE ' + @bd + N' SET SINGLE_USER WITH ROLLBACK IMMEDIATE;'
         EXEC sys.sp_executesql @sql
 

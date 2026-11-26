@@ -16,6 +16,27 @@ GO
 
 
 -- =========================================
+-- CIFRADO DE DATOS PERSONALES
+-- Jerarquía de llaves de SQL Server:
+--   llave maestra del servicio -> llave maestra de la base -> certificado -> llave simétrica AES-256.
+-- La llave maestra de la base queda protegida también por la llave maestra del servicio,
+-- así SQL Server la abre sola en este servidor; en otro servidor (por ejemplo, con un .bak
+-- robado) hace falta la contraseña. En producción la contraseña se guarda fuera del script.
+-- =========================================
+
+CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'Cuchara#Luison-LlaveMaestra-2026';
+GO
+
+CREATE CERTIFICATE cert_datos_personales
+    WITH SUBJECT = 'Cifrado de datos personales de clientes';
+GO
+
+CREATE SYMMETRIC KEY llave_datos_personales
+    WITH ALGORITHM = AES_256
+    ENCRYPTION BY CERTIFICATE cert_datos_personales;
+GO
+
+-- =========================================
 -- TABLA ROL
 -- =========================================
 
@@ -191,7 +212,10 @@ GO
 
 CREATE TABLE CLIENTE (
     id_cliente INT IDENTITY(1,1) PRIMARY KEY,
-    cedula VARCHAR(20) UNIQUE NOT NULL,
+    -- Cédula cifrada con AES-256 (ENCRYPTBYKEY). No se puede indexar ni comparar cifrada,
+    -- por eso se guarda además su huella SHA2-256, que es la que garantiza que no se repita.
+    cedula VARBINARY(256) NOT NULL,
+    cedula_hash BINARY(32) UNIQUE NOT NULL,
     nombre VARCHAR(50) NOT NULL,
     apellido VARCHAR(50) NOT NULL,
     telefono VARCHAR(20),
@@ -280,7 +304,7 @@ CREATE TABLE PEDIDO (
     anulado_por INT,
     motivo_anulacion VARCHAR(255),
 
-    CHECK (estado <> 'ANULADO' OR (anulado_por IS NOT NULL AND motivo_anulacion IS NOT NULL)),
+    CONSTRAINT CK_PEDIDO_Anulacion CHECK (estado <> 'ANULADO' OR (anulado_por IS NOT NULL AND motivo_anulacion IS NOT NULL)),
 
     CONSTRAINT FK_PEDIDO_MESA
         FOREIGN KEY (id_mesa)
@@ -338,7 +362,7 @@ CREATE TABLE TURNO_CAJA (
     monto_inicial DECIMAL(10,2) NOT NULL CHECK (monto_inicial >= 0),
     monto_final DECIMAL(10,2) CHECK (monto_final >= 0),
 
-    CHECK (fecha_cierre IS NULL OR (fecha_cierre >= fecha_apertura AND monto_final IS NOT NULL)),
+    CONSTRAINT CK_TURNO_CAJA_Cierre CHECK (fecha_cierre IS NULL OR (fecha_cierre >= fecha_apertura AND monto_final IS NOT NULL)),
 
     CONSTRAINT FK_TURNO_CAJA_EMPLEADO
         FOREIGN KEY (id_empleado)
@@ -370,8 +394,8 @@ CREATE TABLE FACTURA (
     motivo_anulacion VARCHAR(255),
     fecha_anulacion DATETIME,
 
-    CHECK (descuento <= subtotal AND total = subtotal - descuento + impuesto_ventas + servicio),
-    CHECK (estado <> 'ANULADA' OR (anulada_por IS NOT NULL AND motivo_anulacion IS NOT NULL AND fecha_anulacion IS NOT NULL)),
+    CONSTRAINT CK_FACTURA_Total CHECK (descuento <= subtotal AND total = subtotal - descuento + impuesto_ventas + servicio),
+    CONSTRAINT CK_FACTURA_Anulacion CHECK (estado <> 'ANULADA' OR (anulada_por IS NOT NULL AND motivo_anulacion IS NOT NULL AND fecha_anulacion IS NOT NULL)),
 
     CONSTRAINT FK_FACTURA_PEDIDO
         FOREIGN KEY (id_pedido)
@@ -428,7 +452,7 @@ CREATE TABLE AUDITORIA_PEDIDO (
     id_pedido INT NOT NULL,
     accion VARCHAR(20) NOT NULL,
     usuario_bd VARCHAR(100) NOT NULL DEFAULT SUSER_SNAME(),
-    id_empleado_app INT,
+    id_empleado INT,
     fecha_hora DATETIME NOT NULL DEFAULT GETDATE(),
     estado_anterior VARCHAR(20),
     estado_nuevo VARCHAR(20),
@@ -511,6 +535,8 @@ CREATE INDEX IX_FACTURA_Turno ON FACTURA (id_turno) INCLUDE (estado, total, vuel
 CREATE INDEX IX_PAGO_Factura ON PAGO (id_factura) INCLUDE (id_metodo_pago, monto);
 CREATE INDEX IX_PRODUCTO_CategoriaActivo ON PRODUCTO (id_categoria, activo) INCLUDE (nombre_producto, precio);
 CREATE INDEX IX_ALERTA_STOCK_Pendiente ON ALERTA_STOCK (atendida, id_insumo);
+CREATE INDEX IX_ROL_PERMISO_Permiso ON ROL_PERMISO (id_permiso);
+CREATE INDEX IX_AUDITORIA_PEDIDO_Pedido ON AUDITORIA_PEDIDO (id_pedido, fecha_hora);
 GO
 
 -- Un cajero solo puede tener un turno abierto a la vez

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BitacoraEventoNoSql;
 use App\Models\Factura;
+use App\Support\Sp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -43,8 +44,26 @@ class FacturaController extends Controller
             'motivo_anulacion' => ['required', 'string', 'max:255'],
         ]);
 
-        // El WHERE estado = 'COBRADA' evita anularla dos veces si dos personas lo intentan a la vez
-        // auth()->id() debe ser el id_empleado de quien anula (columna anulada_por, FK a EMPLEADO)
+        // En SQL Server la anulación la hace sp_anular_factura: valida el permiso, bloquea la
+        // factura (UPDLOCK, HOLDLOCK) y la marca ANULADA en una transacción. Si otra persona
+        // la anuló un instante antes, el procedimiento responde con su THROW.
+        if (Sp::disponibles()) {
+            try {
+                Sp::salida('sp_anular_factura', [
+                    'id_factura'  => (int) $factura->id_factura,
+                    'id_empleado' => (int) auth()->id(),
+                    'motivo'      => $datos['motivo_anulacion'],
+                ], 'numero_factura', 'VARCHAR(50)');
+            } catch (\Throwable $e) {
+                return back()->with('error', $this->mensajeSql($e));
+            }
+
+            $this->registrarAnulacionEnBitacora($factura, $datos['motivo_anulacion']);
+
+            return redirect()->route('admin.facturas.show', $factura->id_factura)->with('success', 'Factura anulada correctamente.');
+        }
+
+        // Pruebas automáticas (SQLite, sin procedimientos): misma regla con un UPDATE condicionado
         $anulada = DB::connection('sqlsrv')->transaction(function () use ($factura, $datos) {
             $cobrada = Factura::where('id_factura', $factura->id_factura)
                 ->where('estado', 'COBRADA')
@@ -69,16 +88,22 @@ class FacturaController extends Controller
             return back()->with('error', 'Esta factura ya está anulada.');
         }
 
+        $this->registrarAnulacionEnBitacora($factura, $datos['motivo_anulacion']);
+
+        return redirect()->route('admin.facturas.show', $factura->id_factura)->with('success', 'Factura anulada correctamente.');
+    }
+
+    // ---------- Evento en MongoDB: si Mongo falla, la anulación en SQL Server ya quedó firme ----------
+    private function registrarAnulacionEnBitacora(Factura $factura, string $motivo): void
+    {
         try {
             BitacoraEventoNoSql::create([
                 'evento'     => 'FACTURA_ANULADA',
-                'detalles'   => 'Factura ' . $factura->numero_factura . ' anulada. Motivo: ' . $datos['motivo_anulacion'],
+                'detalles'   => 'Factura ' . $factura->numero_factura . ' anulada. Motivo: ' . $motivo,
                 'created_at' => now(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('Factura anulada en SQL, pero falló la bitácora en MongoDB', ['error' => $e->getMessage()]);
         }
-
-        return redirect()->route('admin.facturas.show', $factura->id_factura)->with('success', 'Factura anulada correctamente.');
     }
 }

@@ -155,6 +155,13 @@ class EmpleadoController extends Controller
 
     private function guardarSubclase(int $idEmpleado, ?string $tipo, array $extra): void
     {
+        if (Sp::disponibles()) {
+            $this->guardarSubclaseConProcedimientos($idEmpleado, $tipo, $extra);
+
+            return;
+        }
+
+        // Pruebas automáticas (SQLite, sin procedimientos)
         foreach (['MESERO', 'COCINERO', 'CAJERO'] as $tabla) {
             DB::table($tabla)->where('id_empleado', $idEmpleado)->delete();
         }
@@ -165,5 +172,37 @@ class EmpleadoController extends Controller
             Rol::CAJERO   => DB::table('CAJERO')->insert(['id_empleado' => $idEmpleado, 'codigo_caja' => $extra['codigo_caja']]),
             default       => null,
         };
+    }
+
+    /**
+     * Subclase con sp_mesero_* / sp_cocinero_* / sp_cajero_*: si el puesto no cambió se actualiza;
+     * si cambió, primero se quita la subclase anterior (la especialización es disjunta y los
+     * procedimientos de insertar lo verifican) y después se crea la nueva.
+     */
+    private function guardarSubclaseConProcedimientos(int $idEmpleado, ?string $tipo, array $extra): void
+    {
+        $tablas = [Rol::MESERO => 'MESERO', Rol::COCINERO => 'COCINERO', Rol::CAJERO => 'CAJERO'];
+        $nuevaTabla = $tablas[$tipo] ?? null;
+
+        foreach ($tablas as $tabla) {
+            if ($tabla !== $nuevaTabla && DB::connection('sqlsrv')->table($tabla)->where('id_empleado', $idEmpleado)->exists()) {
+                Sp::ejecutar('sp_' . strtolower($tabla) . '_eliminar', ['id_empleado' => $idEmpleado]);
+            }
+        }
+
+        if ($nuevaTabla === null) {
+            return;
+        }
+
+        $existe = DB::connection('sqlsrv')->table($nuevaTabla)->where('id_empleado', $idEmpleado)->exists();
+        $procedimiento = 'sp_' . strtolower($nuevaTabla) . ($existe ? '_actualizar' : '_insertar');
+
+        $parametros = match ($nuevaTabla) {
+            'MESERO'   => ['zona_asignada' => $extra['zona_asignada']],
+            'COCINERO' => ['id_estacion' => (int) $extra['id_estacion'], 'especialidad' => $extra['especialidad']],
+            'CAJERO'   => ['codigo_caja' => $extra['codigo_caja']],
+        };
+
+        Sp::ejecutar($procedimiento, ['id_empleado' => $idEmpleado] + $parametros);
     }
 }

@@ -18,7 +18,7 @@
                 <td class="px-4 py-3"><a href="{{ route('admin.pedidos.show', $item->id_pedido) }}" class="text-primary hover:underline">#{{ $item->id_pedido }}</a></td>
                 <td class="px-4 py-3"><x-admin.badge color="blue">{{ $item->accion }}</x-admin.badge></td>
                 <td class="px-4 py-3">{{ $item->usuario_bd }}</td>
-                <td class="px-4 py-3">{{ $item->id_empleado_app ?? '—' }}</td>
+                <td class="px-4 py-3">{{ $item->id_empleado ?? '—' }}</td>
                 <td class="px-4 py-3">{{ \Carbon\Carbon::parse($item->fecha_hora)->format('d/m/Y H:i') }}</td>
                 <td class="px-4 py-3">{{ $item->estado_anterior ?? '—' }} → {{ $item->estado_nuevo ?? '—' }}</td>
                 <td class="px-4 py-3">

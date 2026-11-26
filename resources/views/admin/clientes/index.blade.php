@@ -7,12 +7,12 @@
 @endsection
 
 @section('contenido')
-    {{-- LISTADO DE CLIENTES (tabla CLIENTE) --}}
+    {{-- LISTADO DE CLIENTES (vista vw_cliente: la cédula llega descifrada y aquí se enmascara) --}}
     <x-admin.table :headers="['#', 'Cédula', 'Nombre', 'Teléfono', 'Correo', 'Acciones']">
         @forelse ($items as $item)
             <tr class="border-t border-gray-100">
                 <td class="px-4 py-3">{{ $item->id_cliente }}</td>
-                <td class="px-4 py-3">{{ $item->cedula }}</td>
+                <td class="px-4 py-3 font-mono" title="Cédula cifrada en la base de datos">{{ $item->cedula === null ? '••••••••' : str_repeat('•', max(strlen($item->cedula) - 4, 0)) . substr($item->cedula, -4) }}</td>
                 <td class="px-4 py-3">{{ $item->nombre }} {{ $item->apellido }}</td>
                 <td class="px-4 py-3">{{ $item->telefono ?? '—' }}</td>
                 <td class="px-4 py-3">{{ $item->correo ?? '—' }}</td>
