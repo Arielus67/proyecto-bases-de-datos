@@ -82,5 +82,5 @@
         ];
     @endphp
     <script type="application/json" id="datos-mesero">@json($datosMesero)</script>
-    <script src="{{ asset('js/modulos/mesero.js') }}"></script>
+    <script src="{{ asset('js/modulos/mesero.js') }}?v={{ filemtime(public_path('js/modulos/mesero.js')) }}"></script>
 @endpush

@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let tokenPedido = null;
     let pedido = {};
     let enviando = false;
+    let entregando = 0;
     let sondeo = null;
 
     function generarTokenIdempotencia() {
@@ -395,9 +396,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('click', async event => {
         const boton = event.target.closest('.btn-entregar');
-        if (!boton) return;
+        if (!boton || boton.disabled) return;
 
         boton.disabled = true;
+        entregando++;
 
         try {
             const respuesta = await fetch(config.urlPedidos + '/' + boton.dataset.id + '/entregar', {
@@ -412,14 +414,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!(respuesta.ok && resultado.success)) {
                 Restaurante.notificar('No se pudo marcar como entregado: ' + (resultado.error || 'Error desconocido'), 'error');
+                boton.disabled = false;
             } else {
                 Restaurante.notificar('Pedido #' + boton.dataset.id + ' marcado como entregado.', 'exito');
             }
         } catch (error) {
             console.error(error);
             Restaurante.notificar('Ocurrió un error de red al comunicarse con el servidor.', 'error', 6000);
+            boton.disabled = false;
         }
 
+        // Antes el sondeo se pausaba mientras hubiera un botón deshabilitado, y como solo el
+        // sondeo reemplaza ese botón, la pantalla dejaba de actualizarse para siempre.
+        entregando--;
         if (sondeo) sondeo.ahora();
     });
 
@@ -462,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sondeo = iniciarSondeo({
         url: config.urlEstado,
         intervalo: config.intervalo,
-        pausar: () => enviando || Boolean(document.querySelector('.btn-entregar:disabled')),
+        pausar: () => enviando || entregando > 0,
         alRecibir: html => {
             const recibido = html.trim();
             actualizarFecha();
@@ -479,7 +486,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!primera) {
                 contenedorEstado.querySelectorAll('.mesa-card, .btn-entregar').forEach(nodo => {
                     const clave = claveNodo(nodo);
-                    if (!anteriores.has(clave)) (nodo.closest('.entrega-card') || nodo).classList.add('cambio-reciente');
+                    if (anteriores.has(clave)) return;
+
+                    const tarjeta = nodo.closest('.entrega-card');
+                    (tarjeta || nodo).classList.add('cambio-reciente');
+
+                    // Aviso visible aunque el menú de una mesa tape el panel de entregas
+                    if (tarjeta) {
+                        const mesa = tarjeta.querySelector('.entrega-top strong');
+                        Restaurante.notificar(
+                            'Pedido #' + nodo.dataset.id + (mesa ? ' (' + mesa.textContent.trim() + ')' : '') + ' listo para entregar.',
+                            'exito',
+                            6000
+                        );
+                    }
                 });
                 contenedorEstado.classList.add('refrescado');
                 setTimeout(() => contenedorEstado.classList.remove('refrescado'), 700);
